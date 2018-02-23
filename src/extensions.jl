@@ -76,6 +76,13 @@ function newstruct(T, xs...)
   end
 end
 
+function newstruct!(x, fs...)
+  for (i, f) = enumerate(fs)
+    ccall(:jl_set_nth_field, Void, (Any, Csize_t, Any), x, i-1, f)
+  end
+  return x
+end
+
 newprimitive(T, data) = reinterpret(T, data)[1]
 
 tags[:struct] = d ->
@@ -83,13 +90,16 @@ tags[:struct] = d ->
     newprimitive(d[:type], d[:data]) :
     newstruct(d[:type], d[:data]...)
 
-raise[:struct] = function (d, cache)
-  T = d[:type] = raise_recursive(d[:type], cache)
-  T.mutable || return _raise_recursive(d, cache)
+function newstruct_mutable(T, d, cache)
   x = cache[d] = ccall(:jl_new_struct_uninit, Any, (Any,), T)
   fs = map(x -> raise_recursive(x, cache), d[:data])
-  for (i, f) = enumerate(fs)
-    ccall(:jl_set_nth_field, Void, (Any, Csize_t, Any), x, i-1, f)
-  end
-  return x
+  return newstruct!(x, fs...)
+end
+
+iscyclic(T::DataType) = T.mutable
+
+raise[:struct] = function (d, cache)
+  T = d[:type] = raise_recursive(d[:type], cache)
+  iscyclic(T) || return _raise_recursive(d, cache)
+  return newstruct_mutable(T, d, cache)
 end
