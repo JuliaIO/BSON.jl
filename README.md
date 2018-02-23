@@ -2,6 +2,21 @@
 
 [![Build Status](https://travis-ci.org/MikeInnes/BSON.jl.svg?branch=master)](https://travis-ci.org/MikeInnes/BSON.jl)
 
-[![Coverage Status](https://coveralls.io/repos/MikeInnes/BSON.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/MikeInnes/BSON.jl?branch=master)
+BSON.jl is a Julia package for working with the [Binary JSON](http://bsonspec.org/) serialisation format. It can be used as a general store for Julia data structures, with the following features:
 
-[![codecov.io](http://codecov.io/github/MikeInnes/BSON.jl/coverage.svg?branch=master)](http://codecov.io/github/MikeInnes/BSON.jl?branch=master)
+* **Lightweight and ubiquitous**, with a simple JSON-like data model and clients in many languages.
+* **Efficient** for binary data (eg. arrays of floats).
+* **Flexible** enough to handle anything you throw at it – custom types, circular data structures, etc.
+* **Backwards compatible**, so that if data layout changes old files will still load.
+
+```julia
+julia> using BSON
+
+julia> bson("test.bson", Dict(:a => [1+2im, 3+4im], :b => "Hello, World!"))
+
+julia> BSON.parse("test.bson")
+Dict{Symbol,Any} with 3 entries:
+  :tag  => "struct"
+  :type => Dict{Symbol,Any}(Pair{Symbol,Any}(:tag, "datatype"),Pair{Symbol,Any}(:params, Any[Dict{S…
+  :data => Any[1, 2]
+```
