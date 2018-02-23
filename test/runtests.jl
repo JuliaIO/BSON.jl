@@ -30,6 +30,11 @@ end
 end
 
 @testset "Circular References" begin
+  x = [1,2,3]
+  (x1, x2) = BSON.roundtrip((x,x))
+  @test x1 == x
+  @test x1 === x2
+
   d = Dict{Symbol,Any}(:a=>1)
   d[:d] = d
   d = BSON.roundtrip(d)

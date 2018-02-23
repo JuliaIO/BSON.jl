@@ -68,7 +68,7 @@ const raise = Dict{Symbol,Function}()
 
 function _raise_recursive(d::Associative, cache)
   if haskey(d, :tag) && haskey(tags, Symbol(d[:tag]))
-    tags[Symbol(d[:tag])](applychildren!(x -> raise_recursive(x, cache), d))
+    cache[d] = tags[Symbol(d[:tag])](applychildren!(x -> raise_recursive(x, cache), d))
   else
     cache[d] = d
     applychildren!(x -> raise_recursive(x, cache), d)
