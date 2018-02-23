@@ -84,7 +84,7 @@ tags[:struct] = d ->
 
 raise[:struct] = function (d, cache)
   T = d[:type] = raise_recursive(d[:type], cache)
-  T.mutable || _raise_recursive(d, cache)
+  T.mutable || return _raise_recursive(d, cache)
   x = cache[d] = ccall(:jl_new_struct_uninit, Any, (Any,), T)
   fs = map(x -> raise_recursive(x, cache), d[:data])
   for (i, f) = enumerate(fs)
