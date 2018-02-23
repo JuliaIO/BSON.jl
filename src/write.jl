@@ -80,3 +80,5 @@ end
 bson(io::IO, doc::Associative) = bson_primitive(io, lower_recursive(doc))
 
 bson(path::String, doc::Associative) = open(io -> bson(io, doc), path, "w")
+
+bson(path::String; kws...) = bson(path, Dict(kws))
