@@ -1,17 +1,18 @@
 lower(x::Associative{Symbol}) = BSONDict(x)
-lower(x::Symbol) = Base.string(x)
 lower(x::SimpleVector) = collect(x)
 
+# Basic Types
+
 ismutable(::Symbol) = false
+lower(x::Symbol) = BSONDict(:tag => "symbol", :name => String(x))
+tags[:symbol] = d -> Symbol(d[:name])
 
-# Tuples
-
-lower(x::Tuple) = BSONDict(:tag => :tuple, :data => Any[x...])
+lower(x::Tuple) = BSONDict(:tag => "tuple", :data => Any[x...])
 tags[:tuple] = d -> (d[:data]...,)
 
 # References
 
-ref(path::Symbol...) = BSONDict(:tag => :ref, :path => [path...])
+ref(path::Symbol...) = BSONDict(:tag => "ref", :path => Base.string.([path...]))
 
 resolve(fs) = reduce((m, f) -> getfield(m, Symbol(f)), Main, fs)
 
@@ -26,8 +27,8 @@ lower(m::Module) = ref(modpath(m)...)
 typepath(x::DataType) = [modpath(x.name.module)..., x.name.name]
 
 lower(v::DataType) =
-  BSONDict(:tag => :datatype,
-           :name => typepath(v),
+  BSONDict(:tag => "datatype",
+           :name => Base.string.(typepath(v)),
            :params => v.parameters)
 
 constructtype(T) = T
@@ -42,7 +43,7 @@ lower(x::Vector{UInt8}) = x
 
 function lower(x::Array)
   ndims(x) == 1 && !isbits(eltype(x)) && return Any[x...]
-  BSONDict(:tag => :array, :type => eltype(x), :size => Any[size(x)...],
+  BSONDict(:tag => "array", :type => eltype(x), :size => Any[size(x)...],
            :data => isbits(eltype(x)) ? reinterpret(UInt8, reshape(x, :)) : Any[x...])
 end
 
@@ -58,7 +59,7 @@ isprimitive(T) = nfields(T) == 0 && T.size > 0
 structdata(x) = isprimitive(typeof(x)) ? reinterpret(UInt8, [x]) : Any[getfield(x, f) for f in fieldnames(x)]
 
 function lower(x)
-  BSONDict(:tag => :struct, :type => typeof(x), :data => structdata(x))
+  BSONDict(:tag => "struct", :type => typeof(x), :data => structdata(x))
 end
 
 function newstruct(T, xs...)

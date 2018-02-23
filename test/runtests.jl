@@ -21,6 +21,7 @@ end
 end
 
 @testset "Complex Types" begin
+  @test roundtrip_equal(:foo)
   @test roundtrip_equal(Int64)
   @test roundtrip_equal(Complex{Float32})
   @test roundtrip_equal([1,2,3])
