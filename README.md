@@ -15,8 +15,7 @@ julia> using BSON
 julia> bson("test.bson", Dict(:a => [1+2im, 3+4im], :b => "Hello, World!"))
 
 julia> BSON.parse("test.bson")
-Dict{Symbol,Any} with 3 entries:
-  :tag  => "struct"
-  :type => Dict{Symbol,Any}(Pair{Symbol,Any}(:tag, "datatype"),Pair{Symbol,Any}(:params, Any[Dict{S…
-  :data => Any[1, 2]
+Dict{Symbol,Any} with 2 entries:
+  :a => Complex{Int64}[1+2im, 3+4im]
+  :b => "Hello, World!"
 ```
