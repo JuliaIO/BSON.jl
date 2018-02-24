@@ -14,7 +14,7 @@ julia> using BSON
 
 julia> bson("test.bson", Dict(:a => [1+2im, 3+4im], :b => "Hello, World!"))
 
-julia> BSON.parse("test.bson")
+julia> BSON.load("test.bson")
 Dict{Symbol,Any} with 2 entries:
   :a => Complex{Int64}[1+2im, 3+4im]
   :b => "Hello, World!"

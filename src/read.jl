@@ -90,11 +90,13 @@ raise_recursive(x, cache) = x
 
 raise_recursive(x) = raise_recursive(x, ObjectIdDict())
 
-parse(io::IO) = raise_recursive(backrefs!(parse_doc(io)))
+parse(io::IO) = backrefs!(parse_doc(io))
 parse(path::String) = open(parse, path)
+
+load(x) = raise_recursive(parse(x))
 
 function roundtrip(x)
   buf = IOBuffer()
   bson(buf, Dict(:data => x))
-  parse(seek(buf, 0))[:data]
+  load(seek(buf, 0))[:data]
 end
