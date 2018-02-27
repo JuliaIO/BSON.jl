@@ -1,8 +1,6 @@
 using BSON
 using Base.Test
 
-cd(@__DIR__)
-
 roundtrip_equal(x) = BSON.roundtrip(x) == x
 
 mutable struct Foo
@@ -24,6 +22,8 @@ end
   @test roundtrip_equal(:foo)
   @test roundtrip_equal(Int64)
   @test roundtrip_equal(Complex{Float32})
+  @test roundtrip_equal(Complex)
+  @test roundtrip_equal(Array)
   @test roundtrip_equal([1,2,3])
   @test roundtrip_equal(rand(2,3))
   @test roundtrip_equal(Array{Real}(rand(2,3)))
@@ -46,6 +46,19 @@ end
   x.x = x
   x = BSON.roundtrip(x)
   @test x.x === x
+end
+
+@testset "Anonymous Functions" begin
+  f = x -> x+1
+  f2 = BSON.roundtrip(f)
+  @test f2(5) == f(5)
+  @test typeof(f2) !== typeof(f)
+
+  chicken_tikka_masala(y) = x -> x+y
+  f = chicken_tikka_masala(5)
+  f2 = BSON.roundtrip(f)
+  @test f2(6) == f(6)
+  @test typeof(f2) !== typeof(f)
 end
 
 end

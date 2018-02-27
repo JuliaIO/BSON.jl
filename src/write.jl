@@ -45,12 +45,13 @@ import Base: RefValue
 
 ismutable(T) = !isbits(T)
 ismutable(::Type{String}) = false
-ismutable(::Type{<:Type}) = false
 
-_lower_recursive(x) = applychildren!(x -> _lower_recursive(x), lower(x)::Primitive)
+typeof_(x) = typeof(x)
+typeof_(T::Type) = Type{T}
 
 function _lower_recursive(x, cache, refs)
-  ismutable(typeof(x)) || return RefValue{Any}(_lower_recursive(x))
+  _lower(x) = applychildren!(x -> _lower_recursive(x, cache, refs), lower(x)::Primitive)
+  ismutable(typeof_(x)) || return RefValue{Any}(_lower(x))
   if haskey(cache, x)
     if !any(y -> x === y, refs)
       push!(refs, cache[x])

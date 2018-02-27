@@ -1,5 +1,4 @@
-lower(x::Associative{Symbol}) = BSONDict(x)
-lower(x::SimpleVector) = collect(x)
+lower(x::Dict{Symbol}) = BSONDict(x)
 
 # Basic Types
 
@@ -9,6 +8,10 @@ tags[:symbol] = d -> Symbol(d[:name])
 
 lower(x::Tuple) = BSONDict(:tag => "tuple", :data => Any[x...])
 tags[:tuple] = d -> (d[:data]...,)
+
+ismutable(::Type{SimpleVector}) = false
+lower(x::SimpleVector) = BSONDict(:tag => "svec", :data => Any[x...])
+tags[:svec] = d -> Core.svec(d[:data]...)
 
 # References
 
@@ -20,21 +23,33 @@ tags[:ref] = d -> resolve(d[:path])
 
 modpath(x::Module) = x == Main ? [] : [modpath(module_parent(x))..., module_name(x)]
 
+ismutable(::Type{Module}) = false
 lower(m::Module) = ref(modpath(m)...)
 
 # Types
 
+ismutable(::Type{<:Type}) = false
+
 typepath(x::DataType) = [modpath(x.name.module)..., x.name.name]
 
-lower(v::DataType) =
+function lower(v::DataType)
+  isanon(v) && return lower_anon(v)
   BSONDict(:tag => "datatype",
            :name => Base.string.(typepath(v)),
-           :params => v.parameters)
+           :params => [v.parameters...])
+end
 
 constructtype(T) = T
-constructtype(T::UnionAll, Ts...) = T{Ts...}
+constructtype(T, Ts...) = T{Ts...}
 
 tags[:datatype] = d -> constructtype(resolve(d[:name]), d[:params]...)
+
+lower(v::UnionAll) =
+  BSONDict(:tag => "unionall",
+           :body => v.body,
+           :var => v.var)
+
+tags[:unionall] = d -> UnionAll(d[:var], d[:body])
 
 # Arrays
 
@@ -62,25 +77,29 @@ function lower(x)
   BSONDict(:tag => "struct", :type => typeof(x), :data => structdata(x))
 end
 
+initstruct(T) = ccall(:jl_new_struct_uninit, Any, (Any,), T)
+
+function newstruct!(x, fs...)
+  for (i, f) = enumerate(fs)
+    f = convert(fieldtype(typeof(x),i), f)
+    ccall(:jl_set_nth_field, Void, (Any, Csize_t, Any), x, i-1, f)
+  end
+  return x
+end
+
 function newstruct(T, xs...)
   if isbits(T)
     flds = Any[convert(fieldtype(T, i), x) for (i,x) in enumerate(xs)]
     return ccall(:jl_new_structv, Any, (Any,Ptr{Void},UInt32), T, flds, length(flds))
   else
-    x = ccall(:jl_new_struct_uninit, Any, (Any,), T)
-    for (i, f) = enumerate(xs)
-      f = convert(fieldtype(T,i), f)
-      ccall(:jl_set_nth_field, Void, (Any, Csize_t, Any), x, i-1, f)
-    end
-    return x
+    newstruct!(initstruct(T), xs...)
   end
 end
 
-function newstruct!(x, fs...)
-  for (i, f) = enumerate(fs)
-    ccall(:jl_set_nth_field, Void, (Any, Csize_t, Any), x, i-1, f)
-  end
-  return x
+function newstruct_raw(cache, T, d)
+  x = cache[d] = initstruct(T)
+  fs = map(x -> raise_recursive(x, cache), d[:data])
+  return newstruct!(x, fs...)
 end
 
 newprimitive(T, data) = reinterpret(T, data)[1]
@@ -90,16 +109,13 @@ tags[:struct] = d ->
     newprimitive(d[:type], d[:data]) :
     newstruct(d[:type], d[:data]...)
 
-function newstruct_mutable(T, d, cache)
-  x = cache[d] = ccall(:jl_new_struct_uninit, Any, (Any,), T)
-  fs = map(x -> raise_recursive(x, cache), d[:data])
-  return newstruct!(x, fs...)
-end
-
 iscyclic(T) = ismutable(T)
 
 raise[:struct] = function (d, cache)
   T = d[:type] = raise_recursive(d[:type], cache)
   iscyclic(T) || return _raise_recursive(d, cache)
-  return newstruct_mutable(T, d, cache)
+  return newstruct_raw(cache, T, d)
 end
+
+lower(v::Type{Union{}}) = BSONDict(:tag=>"jl_bottom_type")
+tags[:jl_bottom_type] = d -> Union{}
