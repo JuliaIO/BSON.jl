@@ -43,14 +43,14 @@ lower(x::Primitive) = x
 
 import Base: RefValue
 
-ismutable(x) = !isbits(x)
-ismutable(::String) = false
-ismutable(::Type) = false
+ismutable(T) = !isbits(T)
+ismutable(::Type{String}) = false
+ismutable(::Type{<:Type}) = false
 
 _lower_recursive(x) = applychildren!(x -> _lower_recursive(x), lower(x)::Primitive)
 
 function _lower_recursive(x, cache, refs)
-  ismutable(x) || return RefValue{Any}(_lower_recursive(x))
+  ismutable(typeof(x)) || return RefValue{Any}(_lower_recursive(x))
   if haskey(cache, x)
     if !any(y -> x === y, refs)
       push!(refs, cache[x])

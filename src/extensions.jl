@@ -3,7 +3,7 @@ lower(x::SimpleVector) = collect(x)
 
 # Basic Types
 
-ismutable(::Symbol) = false
+ismutable(::Type{Symbol}) = false
 lower(x::Symbol) = BSONDict(:tag => "symbol", :name => String(x))
 tags[:symbol] = d -> Symbol(d[:name])
 
@@ -96,7 +96,7 @@ function newstruct_mutable(T, d, cache)
   return newstruct!(x, fs...)
 end
 
-iscyclic(T::DataType) = T.mutable
+iscyclic(T) = ismutable(T)
 
 raise[:struct] = function (d, cache)
   T = d[:type] = raise_recursive(d[:type], cache)
