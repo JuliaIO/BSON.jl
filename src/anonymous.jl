@@ -7,7 +7,7 @@ structdata(meth::Method) =
 
 initstruct(::Type{Method}) = ccall(:jl_new_method_uninit, Ref{Method}, ())
 
-function newstruct!(meth, mod, name, file, line, sig,
+function newstruct!(meth::Method, mod, name, file, line, sig,
                     sparam_syms, ambig, nargs, isva, isstaged, ast)
   meth.module = mod
   meth.name = name
