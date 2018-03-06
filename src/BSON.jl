@@ -32,10 +32,13 @@ include("read.jl")
 include("extensions.jl")
 include("anonymous.jl")
 
+using Base.Meta
+
 macro save(file, ks...)
-  @assert all(k -> k isa Symbol, ks)
-  ss = Expr.(:quote, ks)
-  :(bson($(esc(file)), Dict($([:($s=>$(esc(k))) for (s,k) in zip(ss,ks)]...) )))
+  ks = map(k -> k isa Symbol ? (k,k) :
+                isexpr(k,:(=)) && k.args[1] isa Symbol ? (k.args[1],k.args[2]) :
+                error("Unrecognised @save expression $k"), ks)
+  :(bson($(esc(file)), Dict($([:($(Expr(:quote,s))=>$(esc(k))) for (s,k) in ks]...) )))
 end
 
 macro load(file, ks...)
