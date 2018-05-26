@@ -56,32 +56,18 @@ tags[:unionall] = d -> UnionAll(d[:var], d[:body])
 lower(x::Vector{Any}) = copy(x)
 lower(x::Vector{UInt8}) = x
 
-function fix_undefs(x::AbstractArray{<:AbstractString})
-  result = similar(x)
+function replace_undefs!(x::AbstractArray)
+  first_defined_value = x[[isassigned(x,i) for i = 1:length(x)]][1]
   for i = 1:length(x)
-    if isassigned(x, i)
-      result[i] = x[i]
-    else
-      result[i] = "ignored"
+    if !isassigned(x, i)
+      x[i] = first_defined_value
     end
   end
-  return result
-end
-
-function fix_undefs(x::AbstractArray{Symbol})
-  result = similar(x)
-  for i = 1:length(x)
-    if isassigned(x, i)
-      result[i] = x[i]
-    else
-      result[i] = :ignored
-    end
-  end
-  return result
+  return x
 end
 
 function lower(x::Array)
-  x = fix_undefs(x)
+  replace_undefs!(x)
   ndims(x) == 1 && !isbits(eltype(x)) && return Any[x...]
   BSONDict(:tag => "array", :type => eltype(x), :size => Any[size(x)...],
            :data => isbits(eltype(x)) ? reinterpret(UInt8, reshape(x, :)) : Any[x...])
