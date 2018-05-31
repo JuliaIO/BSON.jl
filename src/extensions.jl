@@ -73,6 +73,32 @@ isprimitive(T) = nfields(T) == 0 && T.size > 0
 
 structdata(x) = isprimitive(typeof(x)) ? reinterpret(UInt8, [x]) : Any[getfield(x, f) for f in fieldnames(x)]
 
+function structdata(x::Dict{S,T}) where S where T
+  # x.slots[i] is equal to:
+  #     0x00 if the i-th slot has not yet been defined (i.e. is #undef)
+  #     0x01 if the i-th slot corresponds to a currently existing key-value pair
+  #     0x02 if the i-th slot has been deleted
+  valid_slots = find(getfield(x, :slots) .== 0x01)
+  slots = getfield(x, :slots)[valid_slots]
+  keys = getfield(x, :keys)[valid_slots]
+  vals = getfield(x, :vals)[valid_slots]
+  ndel = getfield(x, :ndel)
+  count = getfield(x, :count)
+  age = getfield(x, :age)
+  idxfloor = getfield(x, :idxfloor)
+  maxprobe = getfield(x, :maxprobe)
+  Any[
+    slots,
+    keys,
+    vals,
+    ndel,
+    count,
+    age,
+    idxfloor,
+    maxprobe,
+  ]
+end
+
 function lower(x)
   BSONDict(:tag => "struct", :type => typeof(x), :data => structdata(x))
 end
