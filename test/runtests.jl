@@ -61,7 +61,7 @@ end
   @test typeof(f2) !== typeof(f)
 end
 
-@testset "Dicts with non-Symbol keys" begin
+@testset "Dicts" begin
   d1 = Dict()
   roundtrip_equal(d1)
 
