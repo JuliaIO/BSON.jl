@@ -84,7 +84,7 @@ function structdata(x::Dict{S,T}) where S where T
   slots = getfield(x, :slots)[filled_slots]
   keys = getfield(x, :keys)[filled_slots]
   vals = getfield(x, :vals)[filled_slots]
-  ndel = 0 
+  ndel = 0
   count = num_filled_slots
   age = 0
   idxfloor = 1
@@ -125,10 +125,19 @@ function newstruct(T, xs...)
   end
 end
 
+function fix_hashes!(x::Any)
+    return x
+end
+
+function fix_hashes!(x::Dict)
+    Base.rehash!(x)
+    return x
+end
+
 function newstruct_raw(cache, T, d)
   x = cache[d] = initstruct(T)
   fs = map(x -> raise_recursive(x, cache), d[:data])
-  return newstruct!(x, fs...)
+  return fix_hashes!(newstruct!(x, fs...))
 end
 
 newprimitive(T, data) = reinterpret(T, data)[1]
