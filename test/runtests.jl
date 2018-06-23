@@ -61,4 +61,63 @@ end
   @test typeof(f2) !== typeof(f)
 end
 
+@testset "Dicts" begin
+  d1 = Dict()
+  roundtrip_equal(d1)
+
+  d2 = Dict("a" => "b")
+  roundtrip_equal(d2)
+
+  d3 = Dict("a" => "b", "c" => "d")
+  roundtrip_equal(d3)
+
+  d4 = Dict("a" => "b", "c" => "d", "e" => "f")
+  roundtrip_equal(d4)
+
+  d5 = Dict("a" => "b", "c" => "d", "e" => 6)
+  roundtrip_equal(d5)
+
+  d6 = Dict("a" => "b", 3 => "d", "e" => "f")
+  roundtrip_equal(d6)
+
+  d7 = Dict("a" => "b", 3 => 4, "e" => "f")
+  roundtrip_equal(d7)
+
+  d8 = Dict("a" => :b)
+  roundtrip_equal(d8)
+
+  d9 = Dict("a" => 1)
+  roundtrip_equal(d9)
+
+  d10 = Dict(1 => "a")
+  roundtrip_equal(d10)
+
+  d11 = Dict(:a => :a)
+  roundtrip_equal(d11)
+
+  d12 = Dict(:a => "a")
+  roundtrip_equal(d12)
+
+  d13 = Dict(:a => 1)
+  roundtrip_equal(d13)
+
+  d14 = Dict("a" => :a)
+  roundtrip_equal(d14)
+
+  d15 = Dict("a" => "a")
+  roundtrip_equal(d15)
+
+  d16 = Dict("a" => 1)
+  roundtrip_equal(d16)
+
+  d17 = Dict(1 => :a)
+  roundtrip_equal(d17)
+
+  d18 = Dict(1 => "a")
+  roundtrip_equal(d18)
+
+  d19 = Dict(1 => 1)
+  roundtrip_equal(d19)
+end
+
 end

@@ -73,6 +73,35 @@ isprimitive(T) = nfields(T) == 0 && T.size > 0
 
 structdata(x) = isprimitive(typeof(x)) ? reinterpret(UInt8, [x]) : Any[getfield(x, f) for f in fieldnames(x)]
 
+function structdata(x::Dict{S,T}) where S where T
+  # x.slots[i] is equal to:
+  #     0x00 if the i-th slot is empty
+  #     0x01 if the i-th slot is filled
+  #     0x02 if the i-th slot is missing
+  filled_slots = find(getfield(x, :slots) .== 0x01)
+  num_filled_slots = length(filled_slots)
+
+  slots = getfield(x, :slots)[filled_slots]
+  keys = getfield(x, :keys)[filled_slots]
+  vals = getfield(x, :vals)[filled_slots]
+  ndel = 0
+  count = num_filled_slots
+  age = 0
+  idxfloor = 1
+  maxprobe = 0
+
+  Any[
+    slots,
+    keys,
+    vals,
+    ndel,
+    count,
+    age,
+    idxfloor,
+    maxprobe,
+  ]
+end
+
 function lower(x)
   BSONDict(:tag => "struct", :type => typeof(x), :data => structdata(x))
 end
@@ -96,10 +125,19 @@ function newstruct(T, xs...)
   end
 end
 
+function fix_hashes!(x::Any)
+    return x
+end
+
+function fix_hashes!(x::Dict)
+    Base.rehash!(x)
+    return x
+end
+
 function newstruct_raw(cache, T, d)
   x = cache[d] = initstruct(T)
   fs = map(x -> raise_recursive(x, cache), d[:data])
-  return newstruct!(x, fs...)
+  return fix_hashes!(newstruct!(x, fs...))
 end
 
 newprimitive(T, data) = reinterpret(T, data)[1]
