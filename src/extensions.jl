@@ -56,10 +56,18 @@ tags[:unionall] = d -> UnionAll(d[:var], d[:body])
 lower(x::Vector{Any}) = copy(x)
 lower(x::Vector{UInt8}) = x
 
+function collect_any(xs)
+  ys = Vector{Any}(length(xs))
+  for i = 1:length(xs)
+    isassigned(xs, i) && (ys[i] = xs[i])
+  end
+  return ys
+end
+
 function lower(x::Array)
-  ndims(x) == 1 && !isbits(eltype(x)) && return Any[x...]
+  ndims(x) == 1 && !isbits(eltype(x)) && return collect_any(x)
   BSONDict(:tag => "array", :type => eltype(x), :size => Any[size(x)...],
-           :data => isbits(eltype(x)) ? reinterpret(UInt8, reshape(x, :)) : Any[x...])
+           :data => isbits(eltype(x)) ? reinterpret(UInt8, reshape(x, :)) : collect_any(x))
 end
 
 tags[:array] = d ->
