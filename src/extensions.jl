@@ -91,7 +91,7 @@ end
 function newstruct(T, xs...)
   if isbits(T)
     flds = Any[convert(fieldtype(T, i), x) for (i,x) in enumerate(xs)]
-    return ccall(:jl_new_structv, Any, (Any,Ptr{Nothing},UInt32), T, flds, length(flds))
+    return ccall(:jl_new_structv, Any, (Any,Ptr{Cvoid},UInt32), T, flds, length(flds))
   else
     newstruct!(initstruct(T), xs...)
   end

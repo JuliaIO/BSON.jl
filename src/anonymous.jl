@@ -64,7 +64,7 @@ function newstruct_raw(cache, ::Type{TypeName}, d)
     tn.mt.max_args = maxa
     for def in defs
       isdefined(def, :sig) || continue
-      ccall(:jl_method_table_insert, Nothing, (Any, Any, Ptr{Nothing}), tn.mt, def, C_NULL)
+      ccall(:jl_method_table_insert, Nothing, (Any, Any, Ptr{Cvoid}), tn.mt, def, C_NULL)
     end
   end
   return tn
