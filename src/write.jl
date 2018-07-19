@@ -1,4 +1,4 @@
-bson_type(::Void) = null
+bson_type(::Nothing) = null
 bson_type(::Bool) = boolean
 bson_type(::Int32) = int32
 bson_type(::Int64) = int64
@@ -8,7 +8,7 @@ bson_type(::Vector{UInt8}) = binary
 bson_type(::BSONDict) = document
 bson_type(::BSONArray) = array
 
-bson_primitive(io::IO, ::Void) = return
+bson_primitive(io::IO, ::Nothing) = return
 bson_primitive(io::IO, x::Union{Bool,Int32,Int64,Float64}) = write(io, x)
 bson_primitive(io::IO, x::Float64) = write(io, x)
 bson_primitive(io::IO, x::Vector{UInt8}) = write(io, Int32(length(x)), 0x00, x)
@@ -43,7 +43,7 @@ lower(x::Primitive) = x
 
 import Base: RefValue
 
-ismutable(T) = !isbits(T)
+ismutable(T) = !isbitstype(T)
 ismutable(::Type{String}) = false
 
 typeof_(x) = typeof(x)
@@ -68,7 +68,7 @@ stripref(x::RefValue) = stripref(x.x)
 stripref(x) = applychildren!(stripref, x)
 
 function lower_recursive(x)
-  cache = ObjectIdDict()
+  cache = IdDict()
   backrefs = []
   x = _lower_recursive(x, cache, backrefs).x
   isempty(backrefs) || (x[:_backrefs] = Any[x.x for x in backrefs])
@@ -78,8 +78,8 @@ end
 
 # Interface
 
-bson(io::IO, doc::Associative) = bson_primitive(io, lower_recursive(doc))
+bson(io::IO, doc::AbstractDict) = bson_primitive(io, lower_recursive(doc))
 
-bson(path::String, doc::Associative) = open(io -> bson(io, doc), path, "w")
+bson(path::String, doc::AbstractDict) = open(io -> bson(io, doc), path, "w")
 
 bson(path::String; kws...) = bson(path, Dict(kws))

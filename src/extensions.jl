@@ -17,11 +17,11 @@ tags[:svec] = d -> Core.svec(d[:data]...)
 
 ref(path::Symbol...) = BSONDict(:tag => "ref", :path => Base.string.([path...]))
 
-resolve(fs) = reduce((m, f) -> getfield(m, Symbol(f)), Main, fs)
+resolve(fs) = reduce((m, f) -> getfield(m, Symbol(f)), fs; init = Main)
 
 tags[:ref] = d -> resolve(d[:path])
 
-modpath(x::Module) = x == Main ? [] : [modpath(module_parent(x))..., module_name(x)]
+modpath(x::Module) = x == Main ? [] : [modpath(parentmodule(x))..., nameof(x)]
 
 ismutable(::Type{Module}) = false
 lower(m::Module) = ref(modpath(m)...)
@@ -63,7 +63,7 @@ function lower(x::Array)
 end
 
 tags[:array] = d ->
-  isbits(d[:type]) ?
+  isbitstype(d[:type]) ?
     reshape(reinterpret(d[:type], d[:data]), d[:size]...) :
     Array{d[:type]}(reshape(d[:data], d[:size]...))
 
@@ -71,7 +71,8 @@ tags[:array] = d ->
 
 isprimitive(T) = nfields(T) == 0 && T.size > 0
 
-structdata(x) = isprimitive(typeof(x)) ? reinterpret(UInt8, [x]) : Any[getfield(x, f) for f in fieldnames(x)]
+structdata(x) = isprimitive(typeof(x)) ? reinterpret(UInt8, [x]) :
+    Any[getfield(x, f) for f in fieldnames(typeof(x))]
 
 function lower(x)
   BSONDict(:tag => "struct", :type => typeof(x), :data => structdata(x))
@@ -82,7 +83,7 @@ initstruct(T) = ccall(:jl_new_struct_uninit, Any, (Any,), T)
 function newstruct!(x, fs...)
   for (i, f) = enumerate(fs)
     f = convert(fieldtype(typeof(x),i), f)
-    ccall(:jl_set_nth_field, Void, (Any, Csize_t, Any), x, i-1, f)
+    ccall(:jl_set_nth_field, Nothing, (Any, Csize_t, Any), x, i-1, f)
   end
   return x
 end
@@ -90,7 +91,7 @@ end
 function newstruct(T, xs...)
   if isbits(T)
     flds = Any[convert(fieldtype(T, i), x) for (i,x) in enumerate(xs)]
-    return ccall(:jl_new_structv, Any, (Any,Ptr{Void},UInt32), T, flds, length(flds))
+    return ccall(:jl_new_structv, Any, (Any,Ptr{Nothing},UInt32), T, flds, length(flds))
   else
     newstruct!(initstruct(T), xs...)
   end

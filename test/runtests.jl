@@ -1,5 +1,5 @@
 using BSON
-using Base.Test
+using Test
 
 roundtrip_equal(x) = BSON.roundtrip(x) == x
 
