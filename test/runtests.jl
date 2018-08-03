@@ -28,6 +28,7 @@ end
   @test roundtrip_equal(rand(2,3))
   @test roundtrip_equal(Array{Real}(rand(2,3)))
   @test roundtrip_equal(1+2im)
+  @test roundtrip_equal(Dict("a"=>1))
 end
 
 @testset "Circular References" begin
