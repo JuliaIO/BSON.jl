@@ -51,7 +51,7 @@ function newstruct_raw(cache, ::Type{TypeName}, d)
               tn, super, parameters, names, types,
               abstr, mutabl, ninitialized)
   ty = tn.wrapper = ndt.name.wrapper
-  ccall(:jl_set_const, Void, (Any, Any, Any), tn.module, tn.name, ty)
+  ccall(:jl_set_const, Nothing, (Any, Any, Any), tn.module, tn.name, ty)
   if has_instance && !isdefined(ty, :instance)
     # use setfield! directly to avoid `fieldtype` lowering expecting to see a Singleton object already on ty
     Core.setfield!(ty, :instance, ccall(:jl_new_struct, Any, (Any, Any...), ty))
@@ -64,7 +64,7 @@ function newstruct_raw(cache, ::Type{TypeName}, d)
     tn.mt.max_args = maxa
     for def in defs
       isdefined(def, :sig) || continue
-      ccall(:jl_method_table_insert, Void, (Any, Any, Ptr{Void}), tn.mt, def, C_NULL)
+      ccall(:jl_method_table_insert, Nothing, (Any, Any, Ptr{Cvoid}), tn.mt, def, C_NULL)
     end
   end
   return tn

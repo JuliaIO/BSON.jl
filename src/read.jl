@@ -1,5 +1,5 @@
 jtype(tag) =
-  tag == null ? Void :
+  tag == null ? Nothing :
   tag == boolean ? Bool :
   tag == int32 ? Int32 :
   tag == int64 ? Int64 :
@@ -66,7 +66,7 @@ const tags = Dict{Symbol,Function}()
 
 const raise = Dict{Symbol,Function}()
 
-function _raise_recursive(d::Associative, cache)
+function _raise_recursive(d::AbstractDict, cache)
   if haskey(d, :tag) && haskey(tags, Symbol(d[:tag]))
     cache[d] = tags[Symbol(d[:tag])](applychildren!(x -> raise_recursive(x, cache), d))
   else
@@ -75,10 +75,10 @@ function _raise_recursive(d::Associative, cache)
   end
 end
 
-function raise_recursive(d::Associative, cache)
+function raise_recursive(d::AbstractDict, cache)
   haskey(cache, d) && return cache[d]
   haskey(d, :tag) && haskey(raise, Symbol(d[:tag])) && return raise[Symbol(d[:tag])](d, cache)
-  _raise_recursive(d::Associative, cache)
+  _raise_recursive(d::AbstractDict, cache)
 end
 
 function raise_recursive(v::BSONArray, cache)
@@ -88,7 +88,7 @@ end
 
 raise_recursive(x, cache) = x
 
-raise_recursive(x) = raise_recursive(x, ObjectIdDict())
+raise_recursive(x) = raise_recursive(x, IdDict())
 
 parse(io::IO) = backrefs!(parse_doc(io))
 parse(path::String) = open(parse, path)
