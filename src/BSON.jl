@@ -22,6 +22,7 @@ end
 
 function applychildren!(f, x::BSONArray)
   for i = 1:length(x)
+    isassigned(x, i) || continue
     x[i] = f(x[i])
   end
   return x

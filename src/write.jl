@@ -35,7 +35,8 @@ end
 
 bson_primitive(io::IO, doc::BSONDict) = bson_doc(io, doc)
 bson_primitive(io::IO, x::BSONArray) =
-  bson_doc(io, [Base.string(i-1) => v for (i, v) in enumerate(x)])
+  bson_doc(io, [Base.string(i-1) => isassigned(x, i) ? x[i] : nothing
+                for i = 1:length(x)])
 
 # Lowering
 
