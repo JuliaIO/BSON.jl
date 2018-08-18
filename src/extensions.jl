@@ -123,3 +123,16 @@ end
 
 lower(v::Type{Union{}}) = BSONDict(:tag=>"jl_bottom_type")
 tags[:jl_bottom_type] = d -> Union{}
+
+# Base data structures
+
+structdata(d::Dict) = Any[collect(keys(d)), collect(values(d))]
+
+initstruct(D::Type{<:Dict}) = D()
+
+function newstruct!(d::Dict, ks, vs)
+  for (k, v) in zip(ks, vs)
+    d[k] = v
+  end
+  return d
+end
