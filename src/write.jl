@@ -67,10 +67,10 @@ end
 stripref(x::RefValue) = stripref(x.x)
 stripref(x) = applychildren!(stripref, x)
 
-function lower_recursive(x)
+function lower_recursive(y)
   cache = IdDict()
   backrefs = []
-  x = _lower_recursive(x, cache, backrefs).x
+  x = _lower_recursive(y, cache, backrefs).x
   isempty(backrefs) || (x[:_backrefs] = Any[x.x for x in backrefs])
   foreach((ix) -> (ix[2].x = BSONDict(:tag=>"backref",:ref=>ix[1])), enumerate(backrefs))
   return stripref(x)
