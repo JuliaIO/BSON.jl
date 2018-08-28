@@ -1,5 +1,6 @@
 module BSON
 
+using Core: SimpleVector, TypeName
 export bson
 
 const BSONDict = Dict{Symbol,Any}
