@@ -17,11 +17,11 @@ tags[:svec] = d -> Core.svec(d[:data]...)
 
 ref(path::Symbol...) = BSONDict(:tag => "ref", :path => Base.string.([path...]))
 
-resolve(fs) = reduce((m, f) -> getfield(m, Symbol(f)), Main, fs)
+resolve(fs) = reduce((m, f) -> getfield(m, Symbol(f)), fs; init = Main)
 
 tags[:ref] = d -> resolve(d[:path])
 
-modpath(x::Module) = x == Main ? [] : [modpath(module_parent(x))..., module_name(x)]
+modpath(x::Module) = x == Main ? [] : [modpath(parentmodule(x))..., nameof(x)]
 
 ismutable(::Type{Module}) = false
 lower(m::Module) = ref(modpath(m)...)
@@ -56,22 +56,26 @@ tags[:unionall] = d -> UnionAll(d[:var], d[:body])
 lower(x::Vector{Any}) = copy(x)
 lower(x::Vector{UInt8}) = x
 
+reinterpret_(::Type{T}, x) where T =
+  T[reinterpret(T, x)...]
+
 function lower(x::Array)
-  ndims(x) == 1 && !isbits(eltype(x)) && return Any[x...]
+  ndims(x) == 1 && !isbitstype(eltype(x)) && return Any[x...]
   BSONDict(:tag => "array", :type => eltype(x), :size => Any[size(x)...],
-           :data => isbits(eltype(x)) ? reinterpret(UInt8, reshape(x, :)) : Any[x...])
+           :data => isbitstype(eltype(x)) ? reinterpret_(UInt8, reshape(x, :)) : Any[x...])
 end
 
 tags[:array] = d ->
-  isbits(d[:type]) ?
-    reshape(reinterpret(d[:type], d[:data]), d[:size]...) :
+  isbitstype(d[:type]) ?
+    reshape(reinterpret_(d[:type], d[:data]), d[:size]...) :
     Array{d[:type]}(reshape(d[:data], d[:size]...))
 
 # Structs
 
-isprimitive(T) = nfields(T) == 0 && T.size > 0
+isprimitive(T) = fieldcount(T) == 0 && T.size > 0
 
-structdata(x) = isprimitive(typeof(x)) ? reinterpret(UInt8, [x]) : Any[getfield(x, f) for f in fieldnames(x)]
+structdata(x) = isprimitive(typeof(x)) ? reinterpret_(UInt8, [x]) :
+    Any[getfield(x, f) for f in fieldnames(typeof(x))]
 
 function lower(x)
   BSONDict(:tag => "struct", :type => typeof(x), :data => structdata(x))
@@ -82,15 +86,15 @@ initstruct(T) = ccall(:jl_new_struct_uninit, Any, (Any,), T)
 function newstruct!(x, fs...)
   for (i, f) = enumerate(fs)
     f = convert(fieldtype(typeof(x),i), f)
-    ccall(:jl_set_nth_field, Void, (Any, Csize_t, Any), x, i-1, f)
+    ccall(:jl_set_nth_field, Nothing, (Any, Csize_t, Any), x, i-1, f)
   end
   return x
 end
 
 function newstruct(T, xs...)
-  if isbits(T)
+  if isbitstype(T)
     flds = Any[convert(fieldtype(T, i), x) for (i,x) in enumerate(xs)]
-    return ccall(:jl_new_structv, Any, (Any,Ptr{Void},UInt32), T, flds, length(flds))
+    return ccall(:jl_new_structv, Any, (Any,Ptr{Cvoid},UInt32), T, flds, length(flds))
   else
     newstruct!(initstruct(T), xs...)
   end
@@ -102,7 +106,7 @@ function newstruct_raw(cache, T, d)
   return newstruct!(x, fs...)
 end
 
-newprimitive(T, data) = reinterpret(T, data)[1]
+newprimitive(T, data) = reinterpret_(T, data)[1]
 
 tags[:struct] = d ->
   isprimitive(d[:type]) ?
