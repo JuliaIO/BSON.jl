@@ -21,7 +21,10 @@ resolve(fs) = reduce((m, f) -> getfield(m, Symbol(f)), fs; init = Main)
 
 tags[:ref] = d -> resolve(d[:path])
 
-modpath(x::Module) = x == Main ? [] : [modpath(parentmodule(x))..., nameof(x)]
+function modpath(x::Module)
+  y = parentmodule(x)
+  x == y ? [nameof(x)] : [modpath(y)..., nameof(x)]
+end
 
 ismutable(::Type{Module}) = false
 lower(m::Module) = ref(modpath(m)...)
