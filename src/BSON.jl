@@ -1,5 +1,6 @@
 module BSON
 
+using Core: SimpleVector, TypeName
 export bson
 
 using Core: SimpleVector, TypeName
