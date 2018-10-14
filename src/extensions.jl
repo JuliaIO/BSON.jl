@@ -42,10 +42,10 @@ function lower(v::DataType)
            :params => [v.parameters...])
 end
 
-constructtype(T) = T
-constructtype(T, Ts...) = T{Ts...}
+constructtype(T, Ts) = (length(Ts) == 0) ? T : T{Ts...}
+constructtype(T::Type{Tuple}, Ts) = T{Ts...}
 
-tags[:datatype] = d -> constructtype(resolve(d[:name]), d[:params]...)
+tags[:datatype] = d -> constructtype(resolve(d[:name]), d[:params])
 
 lower(v::UnionAll) =
   BSONDict(:tag => "unionall",

@@ -93,5 +93,5 @@ function lower_anon(T::DataType)
 end
 
 tags[:jl_anonymous] = function (d)
-  constructtype(d[:typename].wrapper, d[:params]...)
+  constructtype(d[:typename].wrapper, d[:params])
 end
