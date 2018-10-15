@@ -47,7 +47,7 @@ ismutable(T) = !isbitstype(T)
 ismutable(::Type{String}) = false
 
 typeof_(x) = typeof(x)
-typeof_(T::Type) = Type{T}
+typeof_(T::DataType) = T
 
 function _lower_recursive(x, cache, refs)
   _lower(x) = applychildren!(x -> _lower_recursive(x, cache, refs), lower(x)::Primitive)
