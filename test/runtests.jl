@@ -7,6 +7,10 @@ mutable struct Foo
   x
 end
 
+struct T{A}
+  x::A
+end
+
 @testset "BSON" begin
 
 @testset "Primitive Types" begin
@@ -16,6 +20,7 @@ end
   @test roundtrip_equal(UInt8[1,2,3])
   @test roundtrip_equal("b")
   @test roundtrip_equal([1,"b"])
+  @test roundtrip_equal(Tuple)
 end
 
 @testset "Complex Types" begin
@@ -29,6 +34,7 @@ end
   @test roundtrip_equal(Array{Real}(rand(2,3)))
   @test roundtrip_equal(1+2im)
   @test roundtrip_equal(Dict("a"=>1))
+  @test roundtrip_equal(T(()))
 end
 
 @testset "Circular References" begin
