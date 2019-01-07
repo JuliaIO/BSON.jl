@@ -20,7 +20,7 @@ function parse_tag(io::IO, tag::BSONType)
   elseif tag == document
     parse_doc(io)
   elseif tag == array
-    Any[map(x->x[2], parse_pairs(io))...]
+    parse_array(io)
   elseif tag == string
     len = read(io, Int32)-1
     s = String(read(io, len))
@@ -35,9 +35,24 @@ function parse_tag(io::IO, tag::BSONType)
   end
 end
 
-function parse_pairs(io::IO)
+function parse_array(io::IO)::BSONArray
   len = read(io, Int32)
-  ps = []
+  ps = BSONArray()
+
+  while (tag = read(io, BSONType)) ≠ eof
+    # Note that arrays are dicts with the index as the key
+    while read(io, UInt8) != 0x00
+      nothing
+    end
+    push!(ps, parse_tag(io::IO, tag))
+  end
+
+  ps
+end
+
+function parse_pairs(io::IO)::Vector{Pair{Symbol}}
+  len = read(io, Int32)
+  ps = Pair{Symbol}[]
   while (tag = read(io, BSONType)) ≠ eof
     k = Symbol(parse_cstr(io))
     v = parse_tag(io::IO, tag)
