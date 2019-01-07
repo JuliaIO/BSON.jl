@@ -1,4 +1,4 @@
-jtype(tag) =
+jtype(tag::BSONType)::DataType =
   tag == null ? Nothing :
   tag == boolean ? Bool :
   tag == int32 ? Int32 :
@@ -6,15 +6,15 @@ jtype(tag) =
   tag == double ? Float64 :
   error("Unsupported tag $tag")
 
-function parse_cstr(io::IO)
+function parse_cstr(io::IO)::String
   buf = IOBuffer()
   while (ch = read(io, UInt8)) != 0x00
     write(buf, ch)
   end
-  return String(read(seek(buf, 0)))
+  return String(take!(buf))
 end
 
-function parse_tag(io::IO, tag)
+function parse_tag(io::IO, tag::BSONType)
   if tag == null
     nothing
   elseif tag == document
