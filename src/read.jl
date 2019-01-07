@@ -6,13 +6,7 @@ jtype(tag::BSONType)::DataType =
   tag == double ? Float64 :
   error("Unsupported tag $tag")
 
-function parse_cstr(io::IO)::String
-  buf = IOBuffer()
-  while (ch = read(io, UInt8)) != 0x00
-    write(buf, ch)
-  end
-  return String(take!(buf))
-end
+parse_cstr(io::IO) = readuntil(io, '\0')
 
 function parse_tag(io::IO, tag::BSONType)
   if tag == null
