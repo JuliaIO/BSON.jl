@@ -50,18 +50,17 @@ function parse_array(io::IO)::BSONArray
   ps
 end
 
-function parse_pairs(io::IO)::Vector{Pair{Symbol}}
+function parse_doc(io::IO)::BSONDict
   len = read(io, Int32)
-  ps = Pair{Symbol}[]
+  dic = BSONDict()
+
   while (tag = read(io, BSONType)) ≠ eof
     k = Symbol(parse_cstr(io))
-    v = parse_tag(io::IO, tag)
-    push!(ps, k => v)
+    dic[k] = parse_tag(io::IO, tag)
   end
-  return ps
-end
 
-parse_doc(io::IO) = BSONDict(parse_pairs(io))
+  dic
+end
 
 backrefs!(x, refs) = applychildren!(x -> backrefs!(x, refs), x)
 
