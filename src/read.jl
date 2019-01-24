@@ -1,4 +1,4 @@
-jtype(tag) =
+jtype(tag::BSONType)::DataType =
   tag == null ? Nothing :
   tag == boolean ? Bool :
   tag == int32 ? Int32 :
@@ -6,21 +6,15 @@ jtype(tag) =
   tag == double ? Float64 :
   error("Unsupported tag $tag")
 
-function parse_cstr(io::IO)
-  buf = IOBuffer()
-  while (ch = read(io, UInt8)) != 0x00
-    write(buf, ch)
-  end
-  return String(read(seek(buf, 0)))
-end
+parse_cstr(io::IO) = readuntil(io, '\0')
 
-function parse_tag(io::IO, tag)
+function parse_tag(io::IO, tag::BSONType)
   if tag == null
     nothing
   elseif tag == document
     parse_doc(io)
   elseif tag == array
-    Any[map(x->x[2], parse_pairs(io))...]
+    parse_array(io)
   elseif tag == string
     len = read(io, Int32)-1
     s = String(read(io, len))
@@ -35,18 +29,32 @@ function parse_tag(io::IO, tag)
   end
 end
 
-function parse_pairs(io::IO)
+function parse_array(io::IO)::BSONArray
   len = read(io, Int32)
-  ps = []
+  ps = BSONArray()
+
   while (tag = read(io, BSONType)) ≠ eof
-    k = Symbol(parse_cstr(io))
-    v = parse_tag(io::IO, tag)
-    push!(ps, k => v)
+    # Note that arrays are dicts with the index as the key
+    while read(io, UInt8) != 0x00
+      nothing
+    end
+    push!(ps, parse_tag(io::IO, tag))
   end
-  return ps
+
+  ps
 end
 
-parse_doc(io::IO) = BSONDict(parse_pairs(io))
+function parse_doc(io::IO)::BSONDict
+  len = read(io, Int32)
+  dic = BSONDict()
+
+  while (tag = read(io, BSONType)) ≠ eof
+    k = Symbol(parse_cstr(io))
+    dic[k] = parse_tag(io::IO, tag)
+  end
+
+  dic
+end
 
 backrefs!(x, refs) = applychildren!(x -> backrefs!(x, refs), x)
 

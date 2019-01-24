@@ -99,7 +99,16 @@ function newstruct(T, xs...)
     flds = Any[convert(fieldtype(T, i), x) for (i,x) in enumerate(xs)]
     return ccall(:jl_new_structv, Any, (Any,Ptr{Cvoid},UInt32), T, flds, length(flds))
   else
-    newstruct!(initstruct(T), xs...)
+    # Manual inline of newstruct! to work around bug
+    # https://github.com/MikeInnes/BSON.jl/issues/2#issuecomment-452204339
+    x = initstruct(T)
+
+    for (i, f) = enumerate(xs)
+      f = convert(fieldtype(typeof(x),i), f)
+      ccall(:jl_set_nth_field, Nothing, (Any, Csize_t, Any), x, i-1, f)
+    end
+    x
+
   end
 end
 
