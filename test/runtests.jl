@@ -33,6 +33,9 @@ end
   @test roundtrip_equal(rand(2,3))
   @test roundtrip_equal(Array{Real}(rand(2,3)))
   @test roundtrip_equal(1+2im)
+  @test roundtrip_equal(Nothing[])
+  @test roundtrip_equal(fill(nothing, (3,2)))
+  @test roundtrip_equal(Set([1,2,3]))
   @test roundtrip_equal(Dict("a"=>1))
   @test roundtrip_equal(T(()))
 end
