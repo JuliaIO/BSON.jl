@@ -74,34 +74,38 @@ const tags = Dict{Symbol,Function}()
 
 const raise = Dict{Symbol,Function}()
 
-function _raise_recursive(d::AbstractDict, cache)
+function _raise_recursive(d::AbstractDict, cache, init)
   if haskey(d, :tag) && haskey(tags, Symbol(d[:tag]))
-    cache[d] = tags[Symbol(d[:tag])](applychildren!(x -> raise_recursive(x, cache), d))
+    if Symbol(d[:tag]) in (:ref, :datatype)
+      cache[d] = tags[Symbol(d[:tag])](applychildren!(x -> raise_recursive(x, cache, init), d), init)
+    else
+      cache[d] = tags[Symbol(d[:tag])](applychildren!(x -> raise_recursive(x, cache, init), d))
+    end
   else
     cache[d] = d
-    applychildren!(x -> raise_recursive(x, cache), d)
+    applychildren!(x -> raise_recursive(x, cache, init), d)
   end
 end
 
-function raise_recursive(d::AbstractDict, cache)
+function raise_recursive(d::AbstractDict, cache, init)
   haskey(cache, d) && return cache[d]
-  haskey(d, :tag) && haskey(raise, Symbol(d[:tag])) && return raise[Symbol(d[:tag])](d, cache)
-  _raise_recursive(d::AbstractDict, cache)
+  haskey(d, :tag) && haskey(raise, Symbol(d[:tag])) && return raise[Symbol(d[:tag])](d, cache, init)
+  _raise_recursive(d::AbstractDict, cache, init)
 end
 
-function raise_recursive(v::BSONArray, cache)
+function raise_recursive(v::BSONArray, cache, init)
   cache[v] = v
-  applychildren!(x -> raise_recursive(x, cache), v)
+  applychildren!(x -> raise_recursive(x, cache, init), v)
 end
 
-raise_recursive(x, cache) = x
+raise_recursive(x, cache, init) = x
 
-raise_recursive(x) = raise_recursive(x, IdDict())
+raise_recursive(x, init) = raise_recursive(x, IdDict(), init)
 
 parse(io::IO) = backrefs!(parse_doc(io))
 parse(path::String) = open(parse, path)
 
-load(x) = raise_recursive(parse(x))
+load(x, init=Main) = raise_recursive(parse(x), init)
 
 function roundtrip(x)
   buf = IOBuffer()
