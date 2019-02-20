@@ -17,9 +17,9 @@ tags[:svec] = d -> Core.svec(d[:data]...)
 
 ref(path::Symbol...) = BSONDict(:tag => "ref", :path => Base.string.([path...]))
 
-resolve(fs) = reduce((m, f) -> getfield(m, Symbol(f)), fs; init = Main)
+resolve(fs, init) = reduce((m, f) -> getfield(m, Symbol(f)), fs; init = init)
 
-tags[:ref] = d -> resolve(d[:path])
+tags[:ref] = (d, init) -> resolve(d[:path], init)
 
 function modpath(x::Module)
   y = parentmodule(x)
@@ -45,7 +45,7 @@ end
 constructtype(T, Ts) = (length(Ts) == 0) ? T : T{Ts...}
 constructtype(T::Type{Tuple}, Ts) = T{Ts...}
 
-tags[:datatype] = d -> constructtype(resolve(d[:name]), d[:params])
+tags[:datatype] = (d, init) -> constructtype(resolve(d[:name], init), d[:params])
 
 lower(v::UnionAll) =
   BSONDict(:tag => "unionall",
@@ -112,9 +112,9 @@ function newstruct(T, xs...)
   end
 end
 
-function newstruct_raw(cache, T, d)
+function newstruct_raw(cache, T, d, init)
   x = cache[d] = initstruct(T)
-  fs = map(x -> raise_recursive(x, cache), d[:data])
+  fs = map(x -> raise_recursive(x, cache, init), d[:data])
   return newstruct!(x, fs...)
 end
 
@@ -127,10 +127,10 @@ tags[:struct] = d ->
 
 iscyclic(T) = ismutable(T)
 
-raise[:struct] = function (d, cache)
-  T = d[:type] = raise_recursive(d[:type], cache)
-  iscyclic(T) || return _raise_recursive(d, cache)
-  return newstruct_raw(cache, T, d)
+raise[:struct] = function (d, cache, init)
+  T = d[:type] = raise_recursive(d[:type], cache, init)
+  iscyclic(T) || return _raise_recursive(d, cache, init)
+  return newstruct_raw(cache, T, d, init)
 end
 
 lower(v::Type{Union{}}) = BSONDict(:tag=>"jl_bottom_type")
