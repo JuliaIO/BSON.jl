@@ -1,6 +1,7 @@
 #FileIO Interface
 
 fileio_save(f, doc::AbstractDict) = bson(f.filename, doc)
+fileio_save(f, args::Vararg{Pair,N}) where N = bson(f.filename, Dict(args))
 
 #This syntax is already in use to work with |> in FileIO
 #fileio_save(f; kws...) = bson(f.filename, Dict(kws))
