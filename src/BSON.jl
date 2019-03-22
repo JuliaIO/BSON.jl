@@ -7,10 +7,9 @@ using Core: SimpleVector, TypeName
 
 struct BSONDict <: AbstractDict{Symbol,Any}
   d::Dict{Symbol,Any}
+  BSONDict(v...) = new(Dict{Symbol,Any}(v...))
 end
 # implement some of the needed Dict methods
-BSONDict(v) = BSONDict(Dict{Symbol,Any}(v))
-BSONDict(v...) = BSONDict(Dict{Symbol,Any}(v...))
 Base.length(bd::BSONDict) = length(bd.d)
 Base.isempty(bd::BSONDict) = length(bd.d)==0
 Base.setindex!(bd::BSONDict, v, k) = setindex!(bd.d, v, k)
