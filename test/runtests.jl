@@ -11,6 +11,8 @@ struct T{A}
   x::A
 end
 
+struct S end
+
 @testset "BSON" begin
 
 @testset "Primitive Types" begin
@@ -33,6 +35,11 @@ end
   @test roundtrip_equal(rand(2,3))
   @test roundtrip_equal(Array{Real}(rand(2,3)))
   @test roundtrip_equal(1+2im)
+  @test roundtrip_equal(Nothing[])
+  @test roundtrip_equal(S[])
+  @test roundtrip_equal(fill(nothing, (3,2)))
+  @test roundtrip_equal(fill(S(), (1,3)))
+  @test roundtrip_equal(Set([1,2,3]))
   @test roundtrip_equal(Dict("a"=>1))
   @test roundtrip_equal(T(()))
 end
