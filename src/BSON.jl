@@ -34,6 +34,7 @@ include("write.jl")
 include("read.jl")
 include("extensions.jl")
 include("anonymous.jl")
+include("fileio_interface.jl")
 
 using Base.Meta
 
