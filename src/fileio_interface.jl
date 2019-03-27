@@ -1,16 +1,16 @@
 #FileIO Interface
 
 fileio_save(f, doc::AbstractDict) = bson(f.filename, doc)
-fileio_save(f, args::Vararg{Pair,N}) where N = bson(f.filename, Dict(args))
+fileio_save(f, args::Pair...) = bson(f.filename, Dict(args))
 
 #This syntax is already in use to work with |> in FileIO
 #fileio_save(f; kws...) = bson(f.filename, Dict(kws))
 
-function fileio_save(f, args...)
-    @assert length(args) % 2 ==0 "Mismatch between labels and data fields"
-    d = Dict(args[1:2:end] .=> args[2:2:end])
-    bson(f.filename, d)
-end
+#function fileio_save(f, args...)
+#    @assert length(args) % 2 ==0 "Mismatch between labels and data fields"
+#    d = Dict(args[1:2:end] .=> args[2:2:end])
+#    bson(f.filename, d)
+#end
 
 fileio_load(f) = load(f.filename)
 
