@@ -51,10 +51,11 @@ typeof_(T::DataType) = T
 
 function _lower_recursive(x, cache, refs)
   _lower(x) = applychildren!(x -> _lower_recursive(x, cache, refs), lower(x)::Primitive)
+
   ismutable(typeof_(x)) || return RefValue{Any}(_lower(x))
   if haskey(cache, x)
-    if !any(y -> x === y, refs)
-      push!(refs, cache[x])
+    if !haskey(refs, x)
+      refs[x] = cache[x]
     end
     return cache[x]
   end
@@ -69,10 +70,10 @@ stripref(x) = applychildren!(stripref, x)
 
 function lower_recursive(y)
   cache = IdDict()
-  backrefs = []
+  backrefs = IdDict()
   x = _lower_recursive(y, cache, backrefs).x
-  isempty(backrefs) || (x[:_backrefs] = Any[x.x for x in backrefs])
-  foreach((ix) -> (ix[2].x = BSONDict(:tag=>"backref",:ref=>ix[1])), enumerate(backrefs))
+  isempty(backrefs) || (x[:_backrefs] = Any[x.x for x in values(backrefs)])
+  foreach((ix) -> (ix[2].x = BSONDict(:tag=>"backref",:ref=>ix[1])), enumerate(values(backrefs)))
   return stripref(x)
 end
 
