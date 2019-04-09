@@ -32,18 +32,40 @@ end
 
 Foo() = Foo(rstr(5), rstr(7), rstr(17), rstr(11), rstr(13), [Bar() for _ in 1:2000])
 
+const history_file = "./benchmark-history.bson"
+history = if isfile(history_file)
+    BSON.load(history_file)
+else
+    Dict()
+end
+
+macro bench(msg, ex)
+    sex = "$ex"
+    quote
+        GC.gc()
+        @info $msg
+        local val, t1, bytes, gctime, memallocs = @timed $(esc(ex))
+        kb = bytes / 1024
+        if $sex in keys(history)
+            @info $sex elapsed=t1 speedup=history[$sex]/t1 allocatedKb=bytes gctime
+        else
+            @info $sex elapsed=t1 allocatedKb=bytes gctime
+        end
+        history[$sex] = t1
+        val
+    end
+end
+
 foos = Dict(:Foo => Foo())
 io = IOBuffer()
 
-@info "Bench Save BSON"
-@timev bson(io, foos)
+@bench "Bench Save BSON" bson(io, foos)
 seek(io, 0)
 
-@info "Bench Parse BSON"
-dict = @timev BSON.parse(io)
+dict = @bench "Bench Parse BSON" BSON.parse(io)
+@bench "Bench Raise BSON to Julia types" BSON.raise_recursive(dict)
 
-@info "Bench Raise BSON to Julia types"
-@timev BSON.raise_recursive(dict)
+bson(history_file, history)
 
 @info "Profile Save BSON"
 @profile bson(io, foos)
@@ -53,7 +75,7 @@ seek(io, 0)
 
 @info "Profile Parse BSON"
 dict = @profile BSON.parse(io)
-Profile.print(;noisefloor=2)
+Profile.print(;noisefloor=2, C=true)
 Profile.clear()
 
 @info "Profile Raise BSON to Julia types"
