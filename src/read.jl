@@ -44,9 +44,75 @@ function parse_array(io::IO)::BSONArray
   ps
 end
 
-function parse_doc(io::IO)::BSONDict
+function parse_tagged_type(io::IO)::TaggedType
   len = read(io, Int32)
+  name = nothing
+  params = nothing
+
+  for _ in 1:3
+    tag = read(io, BSONType)
+    @assert tag ≠ eof
+    k = Symbol(parse_cstr(io))
+    if k == :name
+      @assert tag == string "tag = $tag ≠ string"
+      name = parse_tag(io, tag)
+    elseif k == :params
+      @assert tag == array "tag = $tag ≠ array"
+      params = parse_tag(io, tag)
+    else
+      @assert k == :tag "tag = $k ≠ :tag"
+      ttag = parse_tag(io, tag)
+      @assert ttag == "datatype" "ttag = $ttag ≠ 'datatype'"
+    end
+  end
+
+  TaggedType(name, params)
+end
+
+function parse_doc(io::IO)::Union{BSONDict, TaggedStruct}
+  len = read(io, Int32)
+
+  # First try to parse this document as a TaggedStruct. Note that both nothing
+  # and missing are valid data values.
+  tdata = (false, nothing)
+  ttype = (false, nothing)
+  ttag = (false, nothing)
+  other = (false, nothing)
+  k = nothing
+
+  for _ in 1:3
+    if (tag = read(io, BSONType)) == eof
+      break
+    end
+    k = Symbol(parse_cstr(io))
+
+    if k == :data
+      @assert tag == array "tag = $tag ≠ array"
+      tdata = (true, parse_tag(io::IO, tag))
+    elseif k == :type
+      @assert tag == document
+      ttype = (true, parse_tagged_type(io::IO))
+    elseif k == :tag
+      @assert tag == string
+      ttag = (true, parse_tag(io::IO, tag))
+    else
+      other = (true, parse_tag(io::IO, tag))
+      break
+    end
+  end
+
+  if ttag[2] == "struct"
+    @assert tdata[1]
+    @assert ttype[1]
+    return TaggedStruct(ttype[2], tdata[2])
+  end
+
+  # It doesn't look like a TaggedStruct, so just allocate a Dict
   dic = BSONDict()
+  tdata[1] && (dic[:data] = tdata[2])
+  ttype[1] && (dic[:type] = ttype[2])
+  ttag[1]  && (dic[:tag] = ttag[2])
+  other[1] && (dic[k] = other[2])
 
   while (tag = read(io, BSONType)) ≠ eof
     k = Symbol(parse_cstr(io))
@@ -105,6 +171,6 @@ load(x) = raise_recursive(parse(x))
 
 function roundtrip(x)
   buf = IOBuffer()
-  bson(buf, Dict(:data => x))
-  load(seek(buf, 0))[:data]
+  bson(buf, Dict(:stuff => x))
+  load(seek(buf, 0))[:stuff]
 end
