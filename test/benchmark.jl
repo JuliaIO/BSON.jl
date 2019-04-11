@@ -56,7 +56,7 @@ macro bench(msg, ex)
     end
 end
 
-foos = Dict(:Foo => Foo())
+foos = Dict(:Foo => Foo(), :Foo2 => Foo(), :Foo3 => Foo())
 io = IOBuffer()
 
 @bench "Bench Save BSON" bson(io, foos)
@@ -67,17 +67,20 @@ dict = @bench "Bench Parse BSON" BSON.parse(io)
 
 bson(history_file, history)
 
+GC.gc()
 @info "Profile Save BSON"
 @profile bson(io, foos)
 Profile.print(;noisefloor=2)
 Profile.clear()
 seek(io, 0)
 
+GC.gc()
 @info "Profile Parse BSON"
 dict = @profile BSON.parse(io)
 Profile.print(;noisefloor=2, C=true)
 Profile.clear()
 
+GC.gc()
 @info "Profile Raise BSON to Julia types"
 rfoos = @profile BSON.raise_recursive(dict)
 Profile.print(;noisefloor=2)
