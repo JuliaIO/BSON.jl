@@ -44,68 +44,82 @@ function parse_array(io::IO)::BSONArray
   ps
 end
 
+const SEEN_REF = 1
+const SEEN_DATA = 2
+const SEEN_TYPE = 4
+const SEEN_TAG = 8
+const SEEN_NAME = 16
+const SEEN_PARAMS = 32
+const SEEN_OTHER = 64
+
 function parse_doc(io::IO)::Union{BSONDict, Tagged}
   len = read(io, Int32)
 
+  seen_state::Int64 = 0
+  see(it::Int64) = seen_state = seen_state | it
+  saw(it::Int64)::Bool = seen_state & it > 0
+
   # First try to parse this document as a TaggedStruct. Note that both nothing
   # and missing are valid data values.
-  tbackref = (false, nothing)
-  tdata = (false, nothing)
-  ttype = (false, nothing)
-  ttag = (false, nothing)
-  tname = (false, nothing)
-  tparams = (false, nothing)
-  other = (false, nothing)
-  k = nothing
+  local tref, tdata, ttype, ttag, tname, tparams, other, k
 
   for _ in 1:4
     if (tag = read(io, BSONType)) == eof
       break
     end
-    k = Symbol(parse_cstr(io))
+    k = parse_cstr(io)
     @debug "Read key" k
 
-    if k == :ref
-      tbackref = (true, parse_tag(io, tag))
-    elseif k == :data
-      tdata = (true, parse_tag(io, tag))
+    if k == "ref"
+      see(SEEN_REF)
+      tref = parse_tag(io, tag)
+    elseif k == "data"
+      see(SEEN_DATA)
+      tdata = parse_tag(io, tag)
       @debug "Read" tdata
-    elseif k == :type
-      ttype = (true, parse_doc(io))
+    elseif k == "type"
+      see(SEEN_TYPE)
+      ttype = parse_tag(io, tag)
       @debug "Read" ttype
-    elseif k == :tag
-      ttag = (true, parse_tag(io, tag))
+    elseif k == "tag"
+      see(SEEN_TAG)
+      ttag = parse_tag(io, tag)
       @debug "Read" ttag
-    elseif k == :name
-      tname = (true, parse_tag(io, tag))
+    elseif k == "name"
+      see(SEEN_NAME)
+      tname = parse_tag(io, tag)
       @debug "Read" tname
-    elseif k == :params
-      tparams = (true, parse_tag(io, tag))
+    elseif k == "params"
+      see(SEEN_PARAMS)
+      tparams = parse_tag(io, tag)
       @debug "Read" tparams
     else
-      other = (true, parse_tag(io, tag))
+      see(SEEN_OTHER)
+      other = parse_tag(io, tag)
       @debug "Read" other
       break
     end
   end
 
-  if !other[1] && ttag[2] == "backref"
-    return TaggedBackref(tbackref[2])
-  elseif !other[1] && ttag[2] == "struct"
-    return TaggedStruct(ttype[2], tdata[2])
-  elseif !other[1] && ttag[2] == "datatype"
-    return TaggedType(tname[2], tparams[2])
+  if saw(SEEN_OTHER)
+    nothing
+  elseif saw(SEEN_TAG | SEEN_REF) && ttag == "backref"
+    return TaggedBackref(tref)
+  elseif saw(SEEN_TAG | SEEN_TYPE | SEEN_DATA) && ttag == "struct"
+    return TaggedStruct(ttype, tdata)
+  elseif saw(SEEN_TAG | SEEN_NAME | SEEN_PARAMS) && ttag == "datatype"
+    return TaggedType(tname, tparams)
   end
 
   # It doesn't look like a Tagged*, so just allocate a Dict
   dic = BSONDict()
-  tbackref[1] && (dic[:ref] = tbackref[2])
-  tdata[1] && (dic[:data] = tdata[2])
-  ttype[1] && (dic[:type] = ttype[2])
-  ttag[1]  && (dic[:tag] = ttag[2])
-  tname[1] && (dic[:name] = tname[2])
-  tparams[1] && (dic[:params] = tparams[2])
-  other[1] && (dic[k] = other[2])
+  saw(SEEN_REF) && (dic[:ref] = tref)
+  saw(SEEN_DATA) && (dic[:data] = tdata)
+  saw(SEEN_TYPE) && (dic[:type] = ttype)
+  saw(SEEN_TAG)  && (dic[:tag] = ttag)
+  saw(SEEN_NAME) && (dic[:name] = tname)
+  saw(SEEN_PARAMS) && (dic[:params] = tparams)
+  saw(SEEN_OTHER) && (dic[Symbol(k)] = other)
 
   if tag == eof
     @debug "Short" dic
@@ -113,7 +127,7 @@ function parse_doc(io::IO)::Union{BSONDict, Tagged}
   end
 
   while (tag = read(io, BSONType)) ≠ eof
-    k = Symbol(parse_cstr(io))
+    local k = Symbol(parse_cstr(io))
     @debug "Read key" k
     dic[k] = parse_tag(io::IO, tag)
   end
