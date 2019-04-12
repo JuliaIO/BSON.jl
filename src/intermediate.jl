@@ -8,6 +8,8 @@ struct TaggedBackref <: Tagged
   ref::Int64
 end
 
+Base.show(io::IO, br::TaggedBackref) = print(io, "Ref(", br.ref, ")")
+
 const TaggedParam = Union{Tagged, TypeVar, BSONDict, Type}
 
 mutable struct TaggedType <: Tagged
