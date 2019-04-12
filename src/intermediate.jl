@@ -4,6 +4,10 @@ Base.haskey(::Tagged, k::Symbol) = k == :tag
 Base.isempty(::Tagged) = false
 Base.length(::Tagged) = 2
 
+struct TaggedBackref <: Tagged
+  ref::Int64
+end
+
 const TaggedParam = Union{Tagged, TypeVar, BSONDict, Type}
 
 mutable struct TaggedType <: Tagged
@@ -22,7 +26,6 @@ else
 end
 
 function Base.setindex!(tt::TaggedType, v::TaggedType, s::Symbol)
-  @assert s == :params "s = $s ≠ :params"
   tt.params = v
 end
 
@@ -51,7 +54,7 @@ function raise_recursive(v::Vector{TaggedParam}, cache)
 end
 
 mutable struct TaggedStruct <: Tagged
-  ttype::Union{TaggedType, DataType, BSONDict}
+  ttype::Union{TaggedType, TaggedBackref, DataType, BSONDict}
   data::Union{Nothing, BSONArray}
 end
 
@@ -66,7 +69,6 @@ else
 end
 
 function Base.setindex!(ts::TaggedStruct, v::DataType, s::Symbol)
-  @assert s == :type "s = $s ≠ :type"
   ts.ttype = v
 end
 

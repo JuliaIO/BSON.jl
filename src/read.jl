@@ -44,11 +44,12 @@ function parse_array(io::IO)::BSONArray
   ps
 end
 
-function parse_doc(io::IO)::Union{BSONDict, TaggedStruct, TaggedType}
+function parse_doc(io::IO)::Union{BSONDict, Tagged}
   len = read(io, Int32)
 
   # First try to parse this document as a TaggedStruct. Note that both nothing
   # and missing are valid data values.
+  tbackref = (false, nothing)
   tdata = (false, nothing)
   ttype = (false, nothing)
   ttag = (false, nothing)
@@ -64,24 +65,21 @@ function parse_doc(io::IO)::Union{BSONDict, TaggedStruct, TaggedType}
     k = Symbol(parse_cstr(io))
     @debug "Read key" k
 
-    if k == :data
-      @assert tag == array "tag = $tag ≠ array"
+    if k == :ref
+      tbackref = (true, parse_tag(io, tag))
+    elseif k == :data
       tdata = (true, parse_tag(io, tag))
       @debug "Read" tdata
     elseif k == :type
-      @assert tag == document
       ttype = (true, parse_doc(io))
       @debug "Read" ttype
     elseif k == :tag
-      @assert tag == string
       ttag = (true, parse_tag(io, tag))
       @debug "Read" ttag
     elseif k == :name
-      @assert tag == array || tag == string "tag = $tag ≠ array ≠ string"
       tname = (true, parse_tag(io, tag))
       @debug "Read" tname
     elseif k == :params
-      @assert tag == array "tag = $tag ≠ array"
       tparams = (true, parse_tag(io, tag))
       @debug "Read" tparams
     else
@@ -91,8 +89,9 @@ function parse_doc(io::IO)::Union{BSONDict, TaggedStruct, TaggedType}
     end
   end
 
-  if !other[1] && ttag[2] == "struct"
-    @assert ttype[1]
+  if !other[1] && ttag[2] == "backref"
+    return TaggedBackref(tbackref[2])
+  elseif !other[1] && ttag[2] == "struct"
     return TaggedStruct(ttype[2], tdata[2])
   elseif !other[1] && ttag[2] == "datatype"
     return TaggedType(tname[2], tparams[2])
@@ -100,6 +99,7 @@ function parse_doc(io::IO)::Union{BSONDict, TaggedStruct, TaggedType}
 
   # It doesn't look like a Tagged*, so just allocate a Dict
   dic = BSONDict()
+  tbackref[1] && (dic[:ref] = tbackref[2])
   tdata[1] && (dic[:data] = tdata[2])
   ttype[1] && (dic[:type] = ttype[2])
   ttag[1]  && (dic[:tag] = ttag[2])
@@ -127,6 +127,8 @@ backrefs!(x, refs) = applychildren!(x -> backrefs!(x, refs), x)
 backrefs!(dict::BSONDict, refs) =
   get(dict, :tag, "") == "backref" ? refs[dict[:ref]] :
   invoke(backrefs!, Tuple{Any,Any}, dict, refs)
+
+backrefs!(bref::TaggedBackref, refs) = refs[bref.ref]
 
 function backrefs!(dict)
   haskey(dict, :_backrefs) || return dict
