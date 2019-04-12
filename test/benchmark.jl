@@ -31,7 +31,7 @@ struct Foo
 end
 
 Foo() = [Foo(rstr(5), rstr(7), rstr(17), rstr(11), rstr(13),
-             [Bar() for _ in 1:2000]) for _ in 1:5]
+             [Bar() for _ in 1:2000]) for _ in 1:3]
 
 struct Result
   elapsed::Float64
@@ -72,30 +72,39 @@ io = IOBuffer()
 @bench "Bench Save BSON" bson(io, foos)
 seek(io, 0)
 
-dict = @bench "Bench Parse BSON" BSON.parse(io)
-rfoos = @bench "Bench Raise BSON to Julia types" BSON.raise_recursive(dict)
+doc = @bench "Bench Parse BSON Document" BSON.parse_doc(io)
+dref_doc = deepcopy(doc)
+dref_doc = @bench "Bench deref" BSON.backrefs!(dref_doc)
+rfoos = @bench "Bench Raise BSON to Julia types" BSON.raise_recursive(dref_doc)
 
 bson(history_file, history)
 
 if get(ENV, "JULIA_PROFILE", nothing) != nothing
+  minc = parse(Int64, get(ENV, "JULIA_PROFILE_MIN", "0"))
   seek(io, 0)
   GC.gc()
   @info "Profile Save BSON"
   @profile bson(io, foos)
-  Profile.print(;noisefloor=2)
+  Profile.print(;noisefloor=2, mincount=minc)
   Profile.clear()
   seek(io, 0)
 
   GC.gc()
-  @info "Profile Parse BSON"
-  dict = @profile BSON.parse(io)
-  Profile.print(;noisefloor=2, C=true)
+  @info "Profile Parse BSON Document"
+  dict = @profile BSON.parse_doc(io)
+  Profile.print(;noisefloor=2, mincount=minc, C=true)
   Profile.clear()
 
   GC.gc()
+  @info "Profile deref"
+  dict = @profile BSON.backrefs!(dict)
+  Profile.print(;noisefloor=2, mincount=minc, C=true)
+  Profile.clear()
+  
+  GC.gc()
   @info "Profile Raise BSON to Julia types"
   rfoos = @profile BSON.raise_recursive(dict)
-  Profile.print(;noisefloor=2)
+  Profile.print(;noisefloor=2, mincount=minc)
   Profile.clear()
 end
 
