@@ -91,10 +91,10 @@ function parse_doc(io::IO)::Union{BSONDict, TaggedStruct, TaggedType}
     end
   end
 
-  if ttag[2] == "struct"
+  if !other[1] && ttag[2] == "struct"
     @assert ttype[1]
     return TaggedStruct(ttype[2], tdata[2])
-  elseif ttag[2] == "datatype"
+  elseif !other[1] && ttag[2] == "datatype"
     return TaggedType(tname[2], tparams[2])
   end
 
