@@ -44,32 +44,7 @@ function parse_array(io::IO)::BSONArray
   ps
 end
 
-function parse_tagged_type(io::IO)::TaggedType
-  len = read(io, Int32)
-  name = nothing
-  params = nothing
-
-  for _ in 1:3
-    tag = read(io, BSONType)
-    @assert tag ≠ eof
-    k = Symbol(parse_cstr(io))
-    if k == :name
-      @assert tag == string "tag = $tag ≠ string"
-      name = parse_tag(io, tag)
-    elseif k == :params
-      @assert tag == array "tag = $tag ≠ array"
-      params = parse_tag(io, tag)
-    else
-      @assert k == :tag "tag = $k ≠ :tag"
-      ttag = parse_tag(io, tag)
-      @assert ttag == "datatype" "ttag = $ttag ≠ 'datatype'"
-    end
-  end
-
-  TaggedType(name, params)
-end
-
-function parse_doc(io::IO)::Union{BSONDict, TaggedStruct}
+function parse_doc(io::IO)::Union{BSONDict, TaggedStruct, TaggedType}
   len = read(io, Int32)
 
   # First try to parse this document as a TaggedStruct. Note that both nothing
@@ -77,48 +52,73 @@ function parse_doc(io::IO)::Union{BSONDict, TaggedStruct}
   tdata = (false, nothing)
   ttype = (false, nothing)
   ttag = (false, nothing)
+  tname = (false, nothing)
+  tparams = (false, nothing)
   other = (false, nothing)
   k = nothing
 
-  for _ in 1:3
+  for _ in 1:4
     if (tag = read(io, BSONType)) == eof
       break
     end
     k = Symbol(parse_cstr(io))
+    @debug "Read key" k
 
     if k == :data
       @assert tag == array "tag = $tag ≠ array"
-      tdata = (true, parse_tag(io::IO, tag))
+      tdata = (true, parse_tag(io, tag))
+      @debug "Read" tdata
     elseif k == :type
       @assert tag == document
-      ttype = (true, parse_tagged_type(io::IO))
+      ttype = (true, parse_doc(io))
+      @debug "Read" ttype
     elseif k == :tag
       @assert tag == string
-      ttag = (true, parse_tag(io::IO, tag))
+      ttag = (true, parse_tag(io, tag))
+      @debug "Read" ttag
+    elseif k == :name
+      @assert tag == array || tag == string "tag = $tag ≠ array ≠ string"
+      tname = (true, parse_tag(io, tag))
+      @debug "Read" tname
+    elseif k == :params
+      @assert tag == array "tag = $tag ≠ array"
+      tparams = (true, parse_tag(io, tag))
+      @debug "Read" tparams
     else
-      other = (true, parse_tag(io::IO, tag))
+      other = (true, parse_tag(io, tag))
+      @debug "Read" other
       break
     end
   end
 
   if ttag[2] == "struct"
-    @assert tdata[1]
     @assert ttype[1]
     return TaggedStruct(ttype[2], tdata[2])
+  elseif ttag[2] == "datatype"
+    return TaggedType(tname[2], tparams[2])
   end
 
-  # It doesn't look like a TaggedStruct, so just allocate a Dict
+  # It doesn't look like a Tagged*, so just allocate a Dict
   dic = BSONDict()
   tdata[1] && (dic[:data] = tdata[2])
   ttype[1] && (dic[:type] = ttype[2])
   ttag[1]  && (dic[:tag] = ttag[2])
+  tname[1] && (dic[:name] = tname[2])
+  tparams[1] && (dic[:params] = tparams[2])
   other[1] && (dic[k] = other[2])
+
+  if tag == eof
+    @debug "Short" dic
+    return dic
+  end
 
   while (tag = read(io, BSONType)) ≠ eof
     k = Symbol(parse_cstr(io))
+    @debug "Read key" k
     dic[k] = parse_tag(io::IO, tag)
   end
 
+  @debug "Long" dic
   dic
 end
 
@@ -155,7 +155,7 @@ function raise_recursive(d::AbstractDict, cache)
   _raise_recursive(d::AbstractDict, cache)
 end
 
-function raise_recursive(v::BSONArray, cache)
+function raise_recursive(v::AbstractVector, cache)
   cache[v] = v
   applychildren!(x -> raise_recursive(x, cache), v)
 end

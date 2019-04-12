@@ -5,8 +5,6 @@ export bson
 
 using Core: SimpleVector, TypeName
 
-import Base.haskey
-
 const BSONDict = Dict{Symbol,Any}
 const BSONArray = Vector{Any}
 const Primitive = Union{Nothing,Bool,Int32,Int64,Float64,String,Vector{UInt8},BSONDict,BSONArray}
@@ -25,12 +23,14 @@ function applychildren!(f::Function, x::BSONDict)::BSONDict
   return x
 end
 
-function applychildren!(f::Function, x::BSONArray)::BSONArray
+function applyvec!(f::Function, x::Vector{T})::Vector{T} where {T}
   for i = 1:length(x)
     x[i] = f(x[i])
   end
   return x
 end
+
+applychildren!(f::Function, x::BSONArray)::BSONArray = applyvec!(f, x)
 
 include("write.jl")
 include("intermediate.jl")
