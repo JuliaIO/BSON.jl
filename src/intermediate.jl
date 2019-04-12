@@ -45,12 +45,12 @@ end
 applychildren!(f::Function, params::Vector{TaggedParam})::Vector{TaggedParam} =
   applyvec!(f, params)
 
-raise_recursive(tt::TaggedType, cache)::Type = get(cache, tt) do
+raise_recursive(tt::TaggedType, cache::IdDict{Any, Any})::Type = get(cache, tt) do
   applychildren!(x -> raise_recursive(x, cache), tt)
   tags[:datatype](tt)
 end
 
-function raise_recursive(v::Vector{TaggedParam}, cache)
+function raise_recursive(v::Vector{TaggedParam}, cache::IdDict{Any, Any})
   cache[v] = v
   applychildren!(x -> raise_recursive(x, cache), v)
 end
@@ -89,6 +89,17 @@ function applychildren!(f::Function, ts::TaggedStruct)::TaggedStruct
   ts
 end
 
-raise_recursive(ts::TaggedStruct, cache) = get(cache, ts) do
-  raise[:struct](ts, cache)
+raise_recursive(ts::TaggedStruct, cache::IdDict{Any, Any}) = get(cache, ts) do
+  T = raise_recursive(ts.ttype, cache)
+
+  if ismutable(T)
+    return newstruct_raw(cache, T, ts)
+  end
+
+  applychildren!(x -> raise_recursive(x, cache), ts)
+  cache[ts] = if isprimitive(T)
+    newprimitive(T, ts.data)
+  else
+    newstruct(T, ts.data...)
+  end
 end

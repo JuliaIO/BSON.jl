@@ -156,7 +156,7 @@ const tags = Dict{Symbol,Function}()
 
 const raise = Dict{Symbol,Function}()
 
-function _raise_recursive(d::AbstractDict, cache)
+function _raise_recursive(d::BSONDict, cache::IdDict{Any, Any})
   if haskey(d, :tag) && haskey(tags, Symbol(d[:tag]))
     cache[d] = tags[Symbol(d[:tag])](applychildren!(x -> raise_recursive(x, cache), d))
   else
@@ -165,20 +165,20 @@ function _raise_recursive(d::AbstractDict, cache)
   end
 end
 
-function raise_recursive(d::AbstractDict, cache)
+function raise_recursive(d::BSONDict, cache::IdDict{Any, Any})
   haskey(cache, d) && return cache[d]
   haskey(d, :tag) && haskey(raise, Symbol(d[:tag])) && return raise[Symbol(d[:tag])](d, cache)
   _raise_recursive(d::AbstractDict, cache)
 end
 
-function raise_recursive(v::AbstractVector, cache)
+function raise_recursive(v::BSONArray, cache::IdDict{Any, Any})
   cache[v] = v
   applychildren!(x -> raise_recursive(x, cache), v)
 end
 
-raise_recursive(x, cache) = x
+raise_recursive(x, ::IdDict{Any, Any}) = x
 
-raise_recursive(x) = raise_recursive(x, IdDict())
+raise_recursive(x) = raise_recursive(x, IdDict{Any, Any}())
 
 parse(io::IO) = backrefs!(parse_doc(io))
 parse(path::String) = open(parse, path)
