@@ -1,20 +1,36 @@
 # Methods
 
+macro get_x_syms(meth)
+  if :slot_syms in fieldnames(Method)
+    :(getfield($(esc(meth)), :slot_syms))
+  else
+    :(getfield($(esc(meth)), :sparam_syms))
+  end
+end
+
+macro set_x_syms(meth, val)
+  if :slot_syms in fieldnames(Method)
+    :(setfield!($(esc(meth)), :slot_syms, $(esc(val))))
+  else
+    :(setfield!($(esc(meth)), :sparam_syms, $(esc(val))))
+  end
+end
+
 structdata(meth::Method) =
-  [meth.module, meth.name, meth.file, meth.line, meth.sig, meth.sparam_syms,
+  [meth.module, meth.name, meth.file, meth.line, meth.sig, @get_x_syms(meth),
    meth.ambig, meth.nargs, meth.isva, meth.nospecialize,
-   Base.uncompressed_ast(meth, meth.source)]
+   Base.uncompressed_ast(meth)]
 
 initstruct(::Type{Method}) = ccall(:jl_new_method_uninit, Ref{Method}, (Any,), Main)
 
 function newstruct!(meth::Method, mod, name, file, line, sig,
-                    sparam_syms, ambig, nargs, isva, nospecialize, ast)
+                    slot_syms, ambig, nargs, isva, nospecialize, ast)
   meth.module = mod
   meth.name = name
   meth.file = file
   meth.line = line
   meth.sig = sig
-  meth.sparam_syms = sparam_syms
+  @set_x_syms(meth, slot_syms)
   meth.ambig = ambig
   meth.nospecialize = nospecialize
   meth.nargs = nargs
