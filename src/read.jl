@@ -6,9 +6,10 @@ jtype(tag::BSONType)::DataType =
   tag == double ? Float64 :
   error("Unsupported tag $tag")
 
-parse_cstr(io::IO) = readuntil(io, '\0')
+parse_cstr(io::IO) where {IOT <: IO} =
+  Base.readuntil_string(io, UInt8(0), false)
 
-function parse_tag(io::IO, tag::BSONType)
+function parse_tag(io::IOT, tag::BSONType) where {IOT <: IO}
   if tag == null
     nothing
   elseif tag == document
@@ -29,7 +30,7 @@ function parse_tag(io::IO, tag::BSONType)
   end
 end
 
-function parse_array(io::IO)::BSONArray
+function parse_array(io::IOT)::BSONArray where {IOT <: IO}
   len = read(io, Int32)
   ps = BSONArray()
 
@@ -38,7 +39,7 @@ function parse_array(io::IO)::BSONArray
     while read(io, UInt8) != 0x00
       nothing
     end
-    push!(ps, parse_tag(io::IO, tag))
+    push!(ps, parse_tag(io::IOT, tag))
   end
 
   ps
@@ -52,7 +53,7 @@ const SEEN_NAME = 16
 const SEEN_PARAMS = 32
 const SEEN_OTHER = 64
 
-function parse_doc(io::IO)::Union{BSONDict, Tagged}
+function parse_doc(io::IOT)::Union{BSONDict, Tagged} where {IOT <: IO}
   len = read(io, Int32)
 
   seen_state::Int64 = 0
@@ -129,7 +130,7 @@ function parse_doc(io::IO)::Union{BSONDict, Tagged}
   while (tag = read(io, BSONType)) ≠ eof
     local k = Symbol(parse_cstr(io))
     @debug "Read key" k
-    dic[k] = parse_tag(io::IO, tag)
+    dic[k] = parse_tag(io::IOT, tag)
   end
 
   @debug "Long" dic
@@ -180,7 +181,7 @@ raise_recursive(x, ::IdDict{Any, Any}) = x
 
 raise_recursive(x) = raise_recursive(x, IdDict{Any, Any}())
 
-parse(io::IO) = backrefs!(parse_doc(io))
+parse(io::IOT) where {IOT <: IO} = backrefs!(parse_doc(io))
 parse(path::String) = open(parse, path)
 
 load(x) = raise_recursive(parse(x))
