@@ -45,14 +45,22 @@ end
 applychildren!(f::Function, params::Vector{TaggedParam})::Vector{TaggedParam} =
   applyvec!(f, params)
 
-raise_recursive(tt::TaggedType, cache::IdDict{Any, Any})::Type = get(cache, tt) do
+function raise_recursive(tt::TaggedType, cache::IdDict{Any, Any})::Type
+  if haskey(cache, tt)
+    return cache[tt]
+  end
+
   applychildren!(x -> raise_recursive(x, cache), tt)
   tags[:datatype](tt)
 end
 
 function raise_recursive(v::Vector{TaggedParam}, cache::IdDict{Any, Any})
-  cache[v] = v
+  if haskey(cache, v)
+    return cache[v]
+  end
+
   applychildren!(x -> raise_recursive(x, cache), v)
+  cache[v] = v
 end
 
 mutable struct TaggedStruct <: Tagged
@@ -89,7 +97,11 @@ function applychildren!(f::Function, ts::TaggedStruct)::TaggedStruct
   ts
 end
 
-raise_recursive(ts::TaggedStruct, cache::IdDict{Any, Any}) = get(cache, ts) do
+function raise_recursive(ts::TaggedStruct, cache::IdDict{Any, Any})
+  if haskey(cache, ts)
+    return cache[ts]
+  end
+
   T = raise_recursive(ts.ttype, cache)
 
   if ismutable(T)
