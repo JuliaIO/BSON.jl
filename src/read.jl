@@ -6,8 +6,21 @@ jtype(tag::BSONType)::DataType =
   tag == double ? Float64 :
   error("Unsupported tag $tag")
 
-parse_cstr(io::IO) where {IOT <: IO} =
-  Base.readuntil_string(io, UInt8(0), false)
+parse_cstr(io::IOT) where {IOT <: IO} =
+  Base.readuntil_string(io, 0x0, false)
+
+parse_cstr_unsafe(io::IO)::Vector{UInt8} = readuntil(io, 0x0, keep=false)
+
+# Not really unsafe, but we do access internal fields directly. Avoids
+# allocating a temporary string/vector.
+function parse_cstr_unsafe(io::IOBuffer)::SubArray{UInt8, 1}
+  st = io.ptr
+
+  while read(io, UInt8) ≠ 0x0
+  end
+
+  view(io.data, st:(io.ptr - 2))
+end
 
 function parse_tag(io::IOT, tag::BSONType) where {IOT <: IO}
   if tag == null
@@ -53,62 +66,120 @@ const SEEN_NAME = 16
 const SEEN_PARAMS = 32
 const SEEN_OTHER = 64
 
+const SEEN_TAG_STRUCT = 128
+const SEEN_TAG_BACKREF = 256
+const SEEN_TAG_DATATYPE = 512
+
+function parse_doc_tag(io::IO)::Union{Int64, String}
+  len = read(io, Int32) - 1
+  tag = read(io, len)
+  eof = read(io, 1)
+
+  if tag == b"backref"
+    SEEN_TAG_BACKREF
+  elseif tag == b"struct"
+    SEEN_TAG_STRUCT
+  elseif tag == b"datatype"
+    SEEN_TAG_DATATYPE
+  else
+    String(tag)
+  end
+end
+
+function parse_doc_tag(io::IOBuffer)::Union{Int64, String}
+  len = read(io, Int32) - 1
+  spos = position(io)
+  tag = parse_cstr_unsafe(io)
+
+  if length(tag) == len
+    if tag == b"backref"
+      #@debug "Seen backref"
+      SEEN_TAG_BACKREF
+    elseif tag == b"struct"
+      #@debug "Seen struct"
+      SEEN_TAG_STRUCT
+    elseif tag == b"datatype"
+      #@debug "Seen datatype"
+      SEEN_TAG_DATATYPE
+    else
+      String(tag)
+    end
+  else
+    seek(io, spos)
+    s = String(read(io, len))
+    eof = read(io, 1)
+    s
+  end
+end
+
 function parse_doc(io::IOT)::Union{BSONDict, Tagged} where {IOT <: IO}
+  #@debug "parse_doc"
   len = read(io, Int32)
 
-  seen_state::Int64 = 0
-  see(it::Int64) = seen_state = seen_state | it
-  saw(it::Int64)::Bool = seen_state & it > 0
+  seen::Int64 = 0
+  see(it::Int64) = seen = seen | it
+  saw(it::Int64)::Bool = seen & it != 0
+  only_saw(it::Int64)::Bool = seen == it
 
-  # First try to parse this document as a TaggedStruct. Note that both nothing
-  # and missing are valid data values.
-  local tref, tdata, ttype, ttag, tname, tparams, other, k
+  # First try to parse this document as a Tagged* intermediate type. Note that
+  # both nothing and missing are valid data values.
+  local tref, tdata, ttype, ttag, tname, tparams, other
+  local k::AbstractVector{UInt8}
 
   for _ in 1:4
     if (tag = read(io, BSONType)) == eof
       break
     end
-    k = parse_cstr(io)
-    @debug "Read key" k
+    k = parse_cstr_unsafe(io)
+    #@debug "Read key" String(k)
 
-    if k == "ref"
+    if k == b"ref"
       see(SEEN_REF)
       tref = parse_tag(io, tag)
-    elseif k == "data"
+    elseif k == b"data"
       see(SEEN_DATA)
       tdata = parse_tag(io, tag)
-      @debug "Read" tdata
-    elseif k == "type"
+      #@debug "Read" tdata
+    elseif k == b"type"
       see(SEEN_TYPE)
       ttype = parse_tag(io, tag)
-      @debug "Read" ttype
-    elseif k == "tag"
+      #@debug "Read" ttype
+    elseif k == b"tag"
       see(SEEN_TAG)
-      ttag = parse_tag(io, tag)
-      @debug "Read" ttag
-    elseif k == "name"
+      if tag == string
+        if (dtag = parse_doc_tag(io)) isa Int64
+          see(dtag)
+        else
+          ttag = dtag
+          #@debug "Read" dtag
+        end
+      else
+        ttag = parse_tag(io, tag)
+        #@debug "Read" ttag
+      end
+    elseif k == b"name"
       see(SEEN_NAME)
       tname = parse_tag(io, tag)
-      @debug "Read" tname
-    elseif k == "params"
+      #@debug "Read" tname
+    elseif k == b"params"
       see(SEEN_PARAMS)
       tparams = parse_tag(io, tag)
-      @debug "Read" tparams
+      #@debug "Read" tparams
     else
       see(SEEN_OTHER)
       other = parse_tag(io, tag)
-      @debug "Read" other
+      #@debug "Read" other
       break
     end
   end
 
   if saw(SEEN_OTHER)
     nothing
-  elseif saw(SEEN_TAG | SEEN_REF) && ttag == "backref"
+  elseif only_saw(SEEN_TAG | SEEN_REF | SEEN_TAG_BACKREF)
     return TaggedBackref(tref)
-  elseif saw(SEEN_TAG | SEEN_TYPE | SEEN_DATA) && ttag == "struct"
+  elseif only_saw(SEEN_TAG | SEEN_TYPE | SEEN_DATA | SEEN_TAG_STRUCT)
     return TaggedStruct(ttype, tdata)
-  elseif saw(SEEN_TAG | SEEN_NAME | SEEN_PARAMS) && ttag == "datatype"
+  elseif only_saw(SEEN_TAG | SEEN_NAME | SEEN_PARAMS | SEEN_TAG_DATATYPE)
     return TaggedType(tname, tparams)
   end
 
@@ -120,20 +191,20 @@ function parse_doc(io::IOT)::Union{BSONDict, Tagged} where {IOT <: IO}
   saw(SEEN_TAG)  && (dic[:tag] = ttag)
   saw(SEEN_NAME) && (dic[:name] = tname)
   saw(SEEN_PARAMS) && (dic[:params] = tparams)
-  saw(SEEN_OTHER) && (dic[Symbol(k)] = other)
+  saw(SEEN_OTHER) && (dic[Symbol(String(k))] = other)
 
   if tag == eof
-    @debug "Short" dic
+    #@debug "Short" dic
     return dic
   end
 
   while (tag = read(io, BSONType)) ≠ eof
     local k = Symbol(parse_cstr(io))
-    @debug "Read key" k
+    #@debug "Read key" k
     dic[k] = parse_tag(io::IOT, tag)
   end
 
-  @debug "Long" dic
+  #@debug "Long" dic
   dic
 end
 
