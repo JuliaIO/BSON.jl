@@ -11,7 +11,10 @@ tags[:tuple] = d -> (d[:data]...,)
 
 ismutable(::Type{SimpleVector}) = false
 lower(x::SimpleVector) = BSONDict(:tag => "svec", :data => Any[x...])
-tags[:svec] = d -> Core.svec(d[:data]...)
+tags[:svec] = d -> begin
+  #@debug "raise svec" d
+  Core.svec(d[:data]...)
+end
 
 # References
 
@@ -89,14 +92,20 @@ end
 initstruct(T) = ccall(:jl_new_struct_uninit, Any, (Any,), T)
 
 function newstruct!(x, fs...)
+  #@debug "newstruct!" typeof(x) fs
   for (i, f) = enumerate(fs)
-    f = convert(fieldtype(typeof(x),i), f)
+    try
+      f = convert(fieldtype(typeof(x),i), f)
+    catch e
+      #@debug "newstruct!" i typeof(x) fieldtype(typeof(x), i)
+      rethrow(e)
+    end
     ccall(:jl_set_nth_field, Nothing, (Any, Csize_t, Any), x, i-1, f)
   end
   return x
 end
 
-function newstruct(T, xs...)
+function newstruct(T::Type, xs...)
   if isbitstype(T)
     flds = Any[convert(fieldtype(T, i), x) for (i,x) in enumerate(xs)]
     return ccall(:jl_new_structv, Any, (Any,Ptr{Cvoid},UInt32), T, flds, length(flds))
@@ -114,10 +123,15 @@ function newstruct(T, xs...)
   end
 end
 
-function newstruct_raw(cache, T, d)
+function newstruct_raw(cache::IdDict{Any, Any}, T::Type,
+                       d::Union{BSONDict, TaggedStruct})
+  @assert isstructtype(T) "$T is not struct type"
+  #@debug "newstruct_raw" T d
+
   x = cache[d] = initstruct(T)
   fs = map(x -> raise_recursive(x, cache), d[:data])
-  return newstruct!(x, fs...)
+
+  newstruct!(x, fs...)
 end
 
 newprimitive(T, data) = reinterpret_(T, data)[1]

@@ -14,9 +14,7 @@ const Primitive = Union{Nothing,Bool,Int32,Int64,Float64,String,Vector{UInt8},BS
   datetime, null, regex, dbpointer, javascript, symbol, javascript_scoped,
   int32, timestamp, int64, decimal128, minkey=0xFF, maxkey=0x7F)
 
-applychildren!(::Function, x) = x
-
-function applychildren!(f::Function, x::BSONDict)::BSONDict
+function applydict!(f::Function, x::T)::T where {T <: AbstractDict}
   for k in keys(x)
     x[k] = f(x[k])
   end
@@ -30,7 +28,27 @@ function applyvec!(f::Function, x::Vector{T})::Vector{T} where {T}
   return x
 end
 
+applychildren!(::Function, x::Union{Primitive, Type{Union{}}, Symbol}) = x
+applychildren!(f::Function, x::BSONDict)::BSONDict = applydict!(f, x)
 applychildren!(f::Function, x::BSONArray)::BSONArray = applyvec!(f, x)
+
+"Cache the result of a calculation for a given input"
+memoise(func::Function, input, cache::IdDict{Any, Any}) = if haskey(cache, input)
+  cache[input]
+else
+  cache[input] = func(input)
+end
+
+"""Cache the input parameter to calculation as its output
+
+Assumes the object is changed inplace. Allows objects to reference themselves.
+"""
+prememoise(func::Function, input, cache::IdDict{Any, Any}) = if haskey(cache, input)
+  cache[input]
+else
+  cache[input] = input
+  func(input)
+end
 
 include("write.jl")
 include("intermediate.jl")

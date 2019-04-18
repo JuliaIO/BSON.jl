@@ -1,94 +1,85 @@
 abstract type Tagged <: AbstractDict{Symbol, Any} end
+abstract type TaggedStructType <: Tagged end
 
-Base.haskey(::Tagged, k::Symbol) = k == :tag
+Base.haskey(tt::T, k::Symbol) where {T <: Tagged} = k == :tag || k in fieldnames(T)
 Base.isempty(::Tagged) = false
-Base.length(::Tagged) = 2
+Base.length(::T) where {T <: Tagged} = length(fieldnames(T))
+Base.getindex(tt::Tagged, k::Symbol) = getfield(tt, k)
+Base.setindex!(tt::Tagged, v, k::Symbol) = setfield!(tt, k, v)
+Base.iterate(tt::T) where {T <: Tagged} = let first = fieldnames(T)[1]
+  (first => tt[first], 2)
+end
+Base.iterate(tt::T, state) where {T <: Tagged} = let names = fieldnames(T)
+  if length(names) >= state
+    next = names[state]
+    (next => tt[next], state + 1)
+  else
+    nothing
+  end
+end
 
-struct TaggedBackref <: Tagged
+function applychildren!(f::Function, tt::T)::T where {T <: Tagged}
+  for fn in fieldnames(T)
+    setfield!(tt, fn, f(getfield(tt, fn)))
+  end
+  tt
+end
+
+struct TaggedBackref <: TaggedStructType
   ref::Int64
 end
 
 Base.show(io::IO, br::TaggedBackref) = print(io, "Ref(", br.ref, ")")
 
-const TaggedParam = Union{Tagged, TypeVar, BSONDict, Type}
+mutable struct TaggedTuple <: Tagged
+  data::BSONArray
+end
 
-mutable struct TaggedType <: Tagged
+mutable struct TaggedSvec <: Tagged
+  data::BSONArray
+end
+
+const TaggedParam = Union{Tagged, TypeVar, Type}
+
+mutable struct TaggedType <: TaggedStructType
   name::Vector{String}
   params::Vector{TaggedParam}
 end
 
-Base.getindex(tt::TaggedType, k::Symbol) = if k == :tag
-  "datatype"
-elseif k == :name
-  tt.name
-elseif k == :params
-  tt.params
-else
-  error("Can't set $k")
+mutable struct TaggedStruct <: TaggedStructType
+  ttype::TaggedStructType
+  data::Union{Nothing, BSONArray}
 end
 
-function Base.setindex!(tt::TaggedType, v::TaggedType, s::Symbol)
-  tt.params = v
+mutable struct TaggedArray <: Tagged
+  ttype::TaggedStructType
+  size::BSONArray
+  data::Union{Vector{UInt8}, BSONArray}
 end
 
-Base.iterate(tt::TaggedType) = (:name => tt.name, 1)
-Base.iterate(tt::TaggedType, state) = if state == 1
-  (:params => tt.params, 2)
-else
-  nothing
+mutable struct TaggedAnonymous <: TaggedStructType
+  typename::Union{TaggedStruct, TaggedBackref}
+  params::Vector{TaggedParam}
 end
 
+struct TaggedRef <: Tagged
+  path::Vector{String}
+end
+
+mutable struct TaggedUnionall <: Tagged
+  var::Union{TaggedStruct, TaggedBackref, TaggedUnionall}
+  body::Union{TaggedType, TaggedBackref, TaggedUnionall, TaggedAnonymous}
+end
+
+function applychildren!(f::Function, tt::Union{TaggedTuple, TaggedSvec})
+  tt.data = f(tt.data)
+  tt
+end
+applychildren!(f::Function, v::Vector{TaggedParam}) = applyvec!(f, v)
 function applychildren!(f::Function, tt::TaggedType)::TaggedType
   tt.params = f(tt.params)
   tt
 end
-applychildren!(f::Function, params::Vector{TaggedParam})::Vector{TaggedParam} =
-  applyvec!(f, params)
-
-function raise_recursive(tt::TaggedType, cache::IdDict{Any, Any})::Type
-  if haskey(cache, tt)
-    return cache[tt]
-  end
-
-  applychildren!(x -> raise_recursive(x, cache), tt)
-  tags[:datatype](tt)
-end
-
-function raise_recursive(v::Vector{TaggedParam}, cache::IdDict{Any, Any})
-  if haskey(cache, v)
-    return cache[v]
-  end
-
-  applychildren!(x -> raise_recursive(x, cache), v)
-  cache[v] = v
-end
-
-mutable struct TaggedStruct <: Tagged
-  ttype::Union{TaggedType, TaggedBackref, DataType, BSONDict}
-  data::Union{Nothing, BSONArray}
-end
-
-Base.getindex(ts::TaggedStruct, k::Symbol) = if k == :tag
-  "struct"
-elseif k == :type
-  ts.ttype
-elseif k == :data && ts.data ≠ nothing
-  ts.data
-else
-  error("Can't get $k")
-end
-
-function Base.setindex!(ts::TaggedStruct, v::DataType, s::Symbol)
-  ts.ttype = v
-end
-
-Base.iterate(ts::TaggedStruct) = (:type => ts.ttype, 1)
-Base.iterate(ts::TaggedStruct, state) = if state == 1 && ts.data ≠ nothing
-  (:data => ts.data, 2)
-else
-  nothing
-end
-
 function applychildren!(f::Function, ts::TaggedStruct)::TaggedStruct
   ts.ttype = f(ts.ttype)
   if ts.data != nothing
@@ -96,22 +87,57 @@ function applychildren!(f::Function, ts::TaggedStruct)::TaggedStruct
   end
   ts
 end
+applychildren!(::Function, tr::TaggedRef) = tr
 
-function raise_recursive(ts::TaggedStruct, cache::IdDict{Any, Any})
-  if haskey(cache, ts)
-    return cache[ts]
-  end
-
-  T = raise_recursive(ts.ttype, cache)
+raise_recursive(tt::TaggedTuple, cache::IdDict{Any, Any})::Tuple = memoise(tt, cache) do x
+  (raise_recursive(x.data, cache)...,)
+end
+raise_recursive(tt::TaggedSvec, cache::IdDict{Any, Any})::SimpleVector = memoise(tt, cache) do x
+  Core.svec(raise_recursive(tt.data, cache)...)
+end
+raise_recursive(v::Vector{TaggedParam}, cache::IdDict{Any, Any}) = prememoise(v, cache) do v
+  applychildren!(x -> raise_recursive(x, cache), v)
+end
+raise_recursive(tt::TaggedType, cache::IdDict{Any, Any})::Type = memoise(tt, cache) do tt
+  constructtype(resolve(tt.name), raise_recursive(tt.params, cache))
+end
+raise_recursive(ts::TaggedStruct, cache::IdDict{Any, Any}) = memoise(ts, cache) do ts
+  T::Type = raise_recursive(ts.ttype, cache)
 
   if ismutable(T)
     return newstruct_raw(cache, T, ts)
   end
 
-  applychildren!(x -> raise_recursive(x, cache), ts)
-  cache[ts] = if isprimitive(T)
-    newprimitive(T, ts.data)
+  data = raise_recursive(ts.data, cache)
+  if isprimitive(T)
+    newprimitive(T, data)
   else
-    newstruct(T, ts.data...)
+    newstruct(T, data...)
   end
+end
+raise_recursive(ta::TaggedArray, cache::IdDict{Any, Any}) = memoise(ta, cache) do ta
+  T::DataType = raise_recursive(ta.ttype, cache)
+  size = raise_recursive(ta.size, cache)
+  data() = raise_recursive(ta.data, cache)
+
+  if isbitstype(T)
+    if sizeof(T) == 0
+      fill(T(), size...)
+    else
+      reshape(reinterpret_(T, data()), size...)
+    end
+  else
+    Array{T}(reshape(data(), size...))
+  end
+end
+raise_recursive(ts::TaggedAnonymous, cache::IdDict{Any, Any}) = memoise(ts, cache) do ts
+  constructtype(raise_recursive(ts.typename, cache).wrapper,
+                raise_recursive(ts.params, cache;))
+end
+raise_recursive(ts::TaggedRef, cache::IdDict{Any, Any}) = memoise(ts, cache) do ts
+  resolve(ts.path)
+end
+raise_recursive(tu::TaggedUnionall, cache::IdDict{Any, Any}) = memoise(tu, cache) do tu
+  UnionAll(raise_recursive(tu.var, cache),
+           raise_recursive(tu.body, cache))
 end

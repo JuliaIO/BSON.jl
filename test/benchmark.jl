@@ -75,7 +75,7 @@ seek(io, 0)
 doc = @bench "Bench Parse BSON Document" BSON.parse_doc(io)
 dref_doc = deepcopy(doc)
 dref_doc = @bench "Bench deref" BSON.backrefs!(dref_doc)
-rfoos = @bench "Bench Raise BSON to Julia types" BSON.raise_recursive(dref_doc)
+rfoos = @bench "Bench Raise BSON to Julia types" BSON.raise_recursive(dref_doc, IdDict{Any, Any}())
 
 bson(history_file, history)
 

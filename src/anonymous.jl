@@ -54,7 +54,10 @@ end
 
 baremodule __deserialized_types__ end
 
-function newstruct_raw(cache, ::Type{TypeName}, d)
+function newstruct_raw(cache::IdDict{Any, Any}, ::Type{TypeName},
+                       d::Union{BSONDict, TaggedStruct})
+
+  # @debug "Anon newstruct_raw" d[:data][3:6] d[:data][end]
   name = raise_recursive(d[:data][2], cache)
   name = isdefined(__deserialized_types__, name) ? gensym() : name
   tn = ccall(:jl_new_typename_in, Ref{Core.TypeName}, (Any, Any),
