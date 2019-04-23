@@ -109,7 +109,7 @@ function newstruct_raw(cache::IdDict{Any, Any}, T::Type, d::TaggedStruct)
   #@debug "newstruct_raw" T d
 
   x = cache[d] = initstruct(T)
-  fs = (raise_recursive(x, cache) for x in d[:data])
+  fs = (raise_recursive(x, cache) for x in d.data)
 
   newstruct!(x, fs...)
 end
