@@ -103,8 +103,8 @@ if get(ENV, "JULIA_PROFILE", nothing) != nothing
   
   GC.gc()
   @info "Profile Raise BSON to Julia types"
-  rfoos = @profile BSON.raise_recursive(dict)
-  Profile.print(;noisefloor=2, mincount=minc)
+  rfoos = @profile BSON.raise_recursive(dict, IdDict{Any, Any}())
+  Profile.print(;noisefloor=2, mincount=minc, C=true)
   Profile.clear()
 end
 
