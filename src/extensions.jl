@@ -4,25 +4,17 @@ lower(x::Dict{Symbol}) = BSONDict(x)
 
 ismutable(::Type{Symbol}) = false
 lower(x::Symbol) = BSONDict(:tag => "symbol", :name => String(x))
-tags[:symbol] = d -> Symbol(d[:name])
 
 lower(x::Tuple) = BSONDict(:tag => "tuple", :data => Any[x...])
-tags[:tuple] = d -> (d[:data]...,)
 
 ismutable(::Type{SimpleVector}) = false
 lower(x::SimpleVector) = BSONDict(:tag => "svec", :data => Any[x...])
-tags[:svec] = d -> begin
-  #@debug "raise svec" d
-  Core.svec(d[:data]...)
-end
 
 # References
 
 ref(path::Symbol...) = BSONDict(:tag => "ref", :path => Base.string.([path...]))
 
 resolve(fs) = reduce((m, f) -> getfield(m, Symbol(f)), fs; init = Main)
-
-tags[:ref] = d -> resolve(d[:path])
 
 function modpath(x::Module)
   y = parentmodule(x)
@@ -48,14 +40,10 @@ end
 constructtype(T, Ts) = (length(Ts) == 0) ? T : T{Ts...}
 constructtype(T::Type{Tuple}, Ts) = T{Ts...}
 
-tags[:datatype] = d -> constructtype(resolve(d[:name]), d[:params])
-
 lower(v::UnionAll) =
   BSONDict(:tag => "unionall",
            :body => v.body,
            :var => v.var)
-
-tags[:unionall] = d -> UnionAll(d[:var], d[:body])
 
 # Arrays
 
@@ -70,13 +58,6 @@ function lower(x::Array)
   BSONDict(:tag => "array", :type => eltype(x), :size => Any[size(x)...],
            :data => isbitstype(eltype(x)) ? reinterpret_(UInt8, reshape(x, :)) : Any[x...])
 end
-
-tags[:array] = d ->
-  isbitstype(d[:type]) ?
-    sizeof(d[:type]) == 0 ?
-      fill(d[:type](), d[:size]...) :
-      reshape(reinterpret_(d[:type], d[:data]), d[:size]...) :
-    Array{d[:type]}(reshape(d[:data], d[:size]...))
 
 # Structs
 
@@ -123,34 +104,21 @@ function newstruct(T::Type, xs...)
   end
 end
 
-function newstruct_raw(cache::IdDict{Any, Any}, T::Type,
-                       d::Union{BSONDict, TaggedStruct})
+function newstruct_raw(cache::IdDict{Any, Any}, T::Type, d::TaggedStruct)
   @assert isstructtype(T) "$T is not struct type"
   #@debug "newstruct_raw" T d
 
   x = cache[d] = initstruct(T)
-  fs = map(x -> raise_recursive(x, cache), d[:data])
+  fs = (raise_recursive(x, cache) for x in d[:data])
 
   newstruct!(x, fs...)
 end
 
 newprimitive(T, data) = reinterpret_(T, data)[1]
 
-tags[:struct] = d ->
-  isprimitive(d[:type]) ?
-    newprimitive(d[:type], d[:data]) :
-    newstruct(d[:type], d[:data]...)
-
 iscyclic(T) = ismutable(T)
 
-raise[:struct] = function (d, cache)
-  T = d[:type] = raise_recursive(d[:type], cache)
-  iscyclic(T) || return _raise_recursive(d, cache)
-  return newstruct_raw(cache, T, d)
-end
-
 lower(v::Type{Union{}}) = BSONDict(:tag=>"jl_bottom_type")
-tags[:jl_bottom_type] = d -> Union{}
 
 # Base data structures
 
