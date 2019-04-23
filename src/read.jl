@@ -284,17 +284,13 @@ function backrefs!(dict)
   return dict
 end
 
-const tags = Dict{Symbol,Function}()
-
-const raise = Dict{Symbol,Function}()
-
-raise_recursive(d::BSONDict, cache::IdDict{Any, Any}) = prememoise(d, cache) do d
+raise_recursive(d::BSONDict, cache::IdDict{Any, Any}) = @prememoise d cache begin
   haskey(d, :tag) && error("Unknown tag: $(d[:tag])")
   applychildren!(x -> raise_recursive(x, cache), d)
 end
 
-raise_recursive(v::BSONArray, cache::IdDict{Any, Any}) = prememoise(v, cache) do u
-  applyvec!(x -> raise_recursive(x, cache), u)
+raise_recursive(v::BSONArray, cache::IdDict{Any, Any}) = @prememoise v cache begin
+  applyvec!(x -> raise_recursive(x, cache), v)
 end
 
 raise_recursive(x::Union{Primitive, Type{Union{}}, Symbol}, ::IdDict{Any, Any}) = x

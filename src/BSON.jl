@@ -33,21 +33,33 @@ applychildren!(f::Function, x::BSONDict)::BSONDict = applydict!(f, x)
 applychildren!(f::Function, x::BSONArray)::BSONArray = applyvec!(f, x)
 
 "Cache the result of a calculation for a given input"
-memoise(func::Function, input, cache::IdDict{Any, Any}) = if haskey(cache, input)
-  cache[input]
-else
-  cache[input] = func(input)
+macro memoise(input, cache, expr)
+  quote
+    local cache = $(esc(cache))
+    local input = $(esc(input))
+    if haskey(cache, input)
+      cache[input]
+    else
+      cache[input] = $(esc(expr))
+    end
+  end
 end
 
 """Cache the input parameter to calculation as its output
 
 Assumes the object is changed inplace. Allows objects to reference themselves.
 """
-prememoise(func::Function, input, cache::IdDict{Any, Any}) = if haskey(cache, input)
-  cache[input]
-else
-  cache[input] = input
-  func(input)
+macro prememoise(input, cache, expr)
+  quote
+    local cache = $(esc(cache))
+    local input = $(esc(input))
+    if haskey(cache, input)
+      cache[input]
+    else
+      cache[input] = input
+      $(esc(expr))
+    end
+  end
 end
 
 include("write.jl")

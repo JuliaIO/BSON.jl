@@ -89,19 +89,19 @@ function applychildren!(f::Function, ts::TaggedStruct)::TaggedStruct
 end
 applychildren!(::Function, tr::TaggedRef) = tr
 
-raise_recursive(tt::TaggedTuple, cache::IdDict{Any, Any})::Tuple = memoise(tt, cache) do x
-  (raise_recursive(x.data, cache)...,)
+raise_recursive(tt::TaggedTuple, cache::IdDict{Any, Any})::Tuple = @memoise tt cache begin
+  (raise_recursive(tt.data, cache)...,)
 end
-raise_recursive(tt::TaggedSvec, cache::IdDict{Any, Any})::SimpleVector = memoise(tt, cache) do x
+raise_recursive(tt::TaggedSvec, cache::IdDict{Any, Any})::SimpleVector = @memoise tt cache begin
   Core.svec(raise_recursive(tt.data, cache)...)
 end
-raise_recursive(v::Vector{TaggedParam}, cache::IdDict{Any, Any}) = prememoise(v, cache) do v
+raise_recursive(v::Vector{TaggedParam}, cache::IdDict{Any, Any}) = @prememoise v cache begin
   applychildren!(x -> raise_recursive(x, cache), v)
 end
-raise_recursive(tt::TaggedType, cache::IdDict{Any, Any})::Type = memoise(tt, cache) do tt
+raise_recursive(tt::TaggedType, cache::IdDict{Any, Any})::Type = @memoise tt cache begin
   constructtype(resolve(tt.name), raise_recursive(tt.params, cache))
 end
-raise_recursive(ts::TaggedStruct, cache::IdDict{Any, Any}) = memoise(ts, cache) do ts
+raise_recursive(ts::TaggedStruct, cache::IdDict{Any, Any}) = @memoise ts cache begin
   T::Type = raise_recursive(ts.ttype, cache)
 
   if ismutable(T)
@@ -115,7 +115,7 @@ raise_recursive(ts::TaggedStruct, cache::IdDict{Any, Any}) = memoise(ts, cache) 
     newstruct(T, data...)
   end
 end
-raise_recursive(ta::TaggedArray, cache::IdDict{Any, Any}) = memoise(ta, cache) do ta
+raise_recursive(ta::TaggedArray, cache::IdDict{Any, Any}) = @memoise ta cache begin
   T::DataType = raise_recursive(ta.ttype, cache)
   size = raise_recursive(ta.size, cache)
   data() = raise_recursive(ta.data, cache)
@@ -130,14 +130,15 @@ raise_recursive(ta::TaggedArray, cache::IdDict{Any, Any}) = memoise(ta, cache) d
     Array{T}(reshape(data(), size...))
   end
 end
-raise_recursive(ts::TaggedAnonymous, cache::IdDict{Any, Any}) = memoise(ts, cache) do ts
-  constructtype(raise_recursive(ts.typename, cache).wrapper,
-                raise_recursive(ts.params, cache;))
+raise_recursive(ts::TaggedAnonymous, cache::IdDict{Any, Any}) = @memoise ts cache begin
+  tn = raise_recursive(ts.typename::TaggedStruct, cache)
+  pr = raise_recursive(ts.params, cache)
+  constructtype(tn.wrapper, pr)
 end
-raise_recursive(ts::TaggedRef, cache::IdDict{Any, Any}) = memoise(ts, cache) do ts
+raise_recursive(ts::TaggedRef, cache::IdDict{Any, Any}) = @memoise ts cache begin
   resolve(ts.path)
 end
-raise_recursive(tu::TaggedUnionall, cache::IdDict{Any, Any}) = memoise(tu, cache) do tu
+raise_recursive(tu::TaggedUnionall, cache::IdDict{Any, Any}) = @memoise tu cache begin
   UnionAll(raise_recursive(tu.var, cache),
            raise_recursive(tu.body, cache))
 end
