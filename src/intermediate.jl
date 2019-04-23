@@ -1,11 +1,18 @@
+"""Type class which represents a tagged dictionary
+
+Tagged dictionaries are used to represent complex Julia types. Using a struct
+instead of an actual Dictionary requires less memory allocation and allows us
+to use multiple dispatch on the resulting tree structure.
+
+It inherits abstract dict just for show."""
 abstract type Tagged <: AbstractDict{Symbol, Any} end
+
+"Type class for types which can occupuy the 'type' field in a struct"
 abstract type TaggedStructType <: Tagged end
 
-Base.haskey(tt::T, k::Symbol) where {T <: Tagged} = k == :tag || k in fieldnames(T)
-Base.isempty(::Tagged) = false
-Base.length(::T) where {T <: Tagged} = length(fieldnames(T))
+# Needed for show
+Base.length(tt::T) where {T <: Tagged} = length(fieldnames(T))
 Base.getindex(tt::Tagged, k::Symbol) = getfield(tt, k)
-Base.setindex!(tt::Tagged, v, k::Symbol) = setfield!(tt, k, v)
 Base.iterate(tt::T) where {T <: Tagged} = let first = fieldnames(T)[1]
   (first => tt[first], 2)
 end
