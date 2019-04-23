@@ -71,6 +71,20 @@ mutable struct TaggedUnionall <: Tagged
   body::Union{TaggedType, TaggedBackref, TaggedUnionall, TaggedAnonymous}
 end
 
+struct BackRefsWrapper
+  root::Union{BSONDict, TaggedStruct}
+  refs::BSONArray
+end
+
+function Base.show(io::IO, brw::BackRefsWrapper)
+  summary(io, brw)
+  print(io, ".root => ")
+  show(io, MIME("text/plain"), brw.root)
+  summary(io, brw)
+  print(io, ".refs => ")
+  show(io, MIME("text/plain"), brw.refs)
+end
+
 function applychildren!(f::Function, tt::Union{TaggedTuple, TaggedSvec})
   tt.data = f(tt.data)
   tt

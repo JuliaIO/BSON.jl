@@ -148,8 +148,9 @@ function parse_doc(io::IOT) where {IOT <: IO}
   local tref, tdata, ttype, ttypename, ttag, tname, tparams, tpath, tsize, tvar, tbody
   local other
   local k::AbstractVector{UInt8}
+  backrefs = nothing
 
-  for _ in 1:5
+  for _ in 1:6
     if (tag = read(io, BSONType)) == eof
       break
     end
@@ -204,6 +205,8 @@ function parse_doc(io::IOT) where {IOT <: IO}
     elseif k == b"body"
       see(SEEN_BODY)
       tbody = parse_tag(io, tag)
+    elseif k == b"_backrefs"
+      backrefs = parse_tag(io, tag)
     else
       see(SEEN_OTHER)
       other = parse_tag(io, tag)
@@ -212,76 +215,75 @@ function parse_doc(io::IOT) where {IOT <: IO}
     end
   end
 
-  if saw(SEEN_OTHER)
-    nothing
-  elseif only_saw(SEEN_TAG | SEEN_REF | SEEN_TAG_BACKREF)
-    return TaggedBackref(tref)
+  ret = if only_saw(SEEN_TAG | SEEN_REF | SEEN_TAG_BACKREF)
+    TaggedBackref(tref)
   elseif only_saw(SEEN_TAG | SEEN_TYPE | SEEN_DATA | SEEN_TAG_STRUCT)
-    return TaggedStruct(ttype, tdata)
+    TaggedStruct(ttype, tdata)
   elseif only_saw(SEEN_TAG | SEEN_NAME | SEEN_PARAMS | SEEN_TAG_DATATYPE)
-    return TaggedType(tname, tparams)
+    TaggedType(tname, tparams)
   elseif only_saw(SEEN_TAG | SEEN_NAME | SEEN_TAG_SYMBOL)
-    return Symbol(tname)
+    Symbol(tname)
   elseif only_saw(SEEN_TAG | SEEN_DATA | SEEN_TAG_TUPLE)
-    return TaggedTuple(tdata)
+    TaggedTuple(tdata)
   elseif only_saw(SEEN_TAG | SEEN_DATA | SEEN_TAG_SVEC)
-    return TaggedSvec(tdata)
+    TaggedSvec(tdata)
   elseif only_saw(SEEN_TAG | SEEN_TAG_UNION)
-    return Union{}
+    Union{}
   elseif only_saw(SEEN_TAG | SEEN_TYPENAME | SEEN_PARAMS | SEEN_TAG_ANON)
-    return TaggedAnonymous(ttypename, tparams)
+    TaggedAnonymous(ttypename, tparams)
   elseif only_saw(SEEN_TAG | SEEN_PATH | SEEN_TAG_REF)
-    return TaggedRef(tpath)
+    TaggedRef(tpath)
   elseif only_saw(SEEN_TAG | SEEN_TYPE | SEEN_SIZE | SEEN_DATA | SEEN_TAG_ARRAY)
-    return TaggedArray(ttype, tsize, tdata)
+    TaggedArray(ttype, tsize, tdata)
   elseif only_saw(SEEN_TAG | SEEN_VAR | SEEN_BODY | SEEN_TAG_UNIONALL)
-    return TaggedUnionall(tvar, tbody)
+    TaggedUnionall(tvar, tbody)
+  else
+    # It doesn't look like a Tagged*, so just allocate a Dict
+    dic = BSONDict()
+    saw(SEEN_REF) && (dic[:ref] = tref)
+    saw(SEEN_DATA) && (dic[:data] = tdata)
+    saw(SEEN_TYPE) && (dic[:type] = ttype)
+    saw(SEEN_TYPENAME) && (dic[:typename] = ttypename)
+    saw(SEEN_TAG)  && (dic[:tag] = ttag)
+    saw(SEEN_NAME) && (dic[:name] = tname)
+    saw(SEEN_PARAMS) && (dic[:params] = tparams)
+    saw(SEEN_PATH) && (dic[:path] = tpath)
+    saw(SEEN_SIZE) && (dic[:size] = tsize)
+    saw(SEEN_VAR) && (dic[:var] = tvar)
+    saw(SEEN_BODY) && (dic[:body] = tbody)
+    saw(SEEN_OTHER) && (dic[Symbol(String(k))] = other)
+
+    if tag != eof
+      while (tag = read(io, BSONType)) ≠ eof
+        local k = Symbol(parse_cstr(io))
+        #@debug "Read key" k
+        dic[k] = parse_tag(io::IOT, tag)
+      end
+    end
+
+    if haskey(dic, :_backrefs)
+      backrefs = dic[:_backrefs]
+      delete!(dic, :_backrefs)
+    end
+
+    dic
   end
 
-  # It doesn't look like a Tagged*, so just allocate a Dict
-  dic = BSONDict()
-  saw(SEEN_REF) && (dic[:ref] = tref)
-  saw(SEEN_DATA) && (dic[:data] = tdata)
-  saw(SEEN_TYPE) && (dic[:type] = ttype)
-  saw(SEEN_TYPENAME) && (dic[:typename] = ttypename)
-  saw(SEEN_TAG)  && (dic[:tag] = ttag)
-  saw(SEEN_NAME) && (dic[:name] = tname)
-  saw(SEEN_PARAMS) && (dic[:params] = tparams)
-  saw(SEEN_PATH) && (dic[:path] = tpath)
-  saw(SEEN_SIZE) && (dic[:size] = tsize)
-  saw(SEEN_VAR) && (dic[:var] = tvar)
-  saw(SEEN_BODY) && (dic[:body] = tbody)
-  saw(SEEN_OTHER) && (dic[Symbol(String(k))] = other)
-
-  if tag == eof
-    #@debug "Short" dic
-    return dic
+  if backrefs != nothing
+    BackRefsWrapper(ret, backrefs)
+  else
+    ret
   end
-
-  while (tag = read(io, BSONType)) ≠ eof
-    local k = Symbol(parse_cstr(io))
-    #@debug "Read key" k
-    dic[k] = parse_tag(io::IOT, tag)
-  end
-
-  #@debug "Long" dic
-  dic
 end
 
 backrefs!(x, refs) = applychildren!(x -> backrefs!(x, refs), x)
 
-backrefs!(dict::BSONDict, refs) =
-  get(dict, :tag, "") == "backref" ? refs[dict[:ref]] :
-  invoke(backrefs!, Tuple{Any,Any}, dict, refs)
-
 backrefs!(bref::TaggedBackref, refs) = refs[bref.ref]
 
-function backrefs!(dict)
-  haskey(dict, :_backrefs) || return dict
-  refs = dict[:_backrefs]
-  backrefs!(dict, refs)
-  delete!(dict, :_backrefs)
-  return dict
+backrefs!(x) = x
+function backrefs!(dict::BackRefsWrapper)
+  backrefs!(dict.refs, dict.refs)
+  backrefs!(dict.root, dict.refs)
 end
 
 raise_recursive(d::BSONDict, cache::IdDict{Any, Any}) = @prememoise d cache begin
