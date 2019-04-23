@@ -3,6 +3,8 @@ using Test
 
 roundtrip_equal(x) = BSON.roundtrip(x) == x
 
+abstract type Bar end
+
 mutable struct Foo
   x
 end
@@ -12,6 +14,8 @@ struct T{A}
 end
 
 struct S end
+
+struct Baz <: Bar end
 
 @testset "BSON" begin
 
@@ -42,6 +46,7 @@ end
   @test roundtrip_equal(Set([1,2,3]))
   @test roundtrip_equal(Dict("a"=>1))
   @test roundtrip_equal(T(()))
+  @test roundtrip_equal(T{Bar}(Baz()))
 end
 
 @testset "Circular References" begin
