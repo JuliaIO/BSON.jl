@@ -92,6 +92,8 @@ function do_bench()
 end
 
 function do_profile()
+  io = IOBuffer()
+  foos = Dict(:Foo => Foo(), :Foo2 => Foo(), :Foo3 => Foo())
   minc = parse(Int64, get(ENV, "JULIA_PROFILE_MIN", "0"))
   seek(io, 0)
   GC.gc()
