@@ -55,7 +55,7 @@ end
 
 mutable struct TaggedStruct <: TaggedStructType
   ttype::TaggedStructType
-  data::Union{Nothing, BSONArray}
+  data::BSONArray
 end
 
 mutable struct TaggedArray <: Tagged
@@ -110,20 +110,34 @@ function applychildren!(f::Function, ts::TaggedStruct)::TaggedStruct
 end
 applychildren!(::Function, tr::TaggedRef) = tr
 
-raise_recursive(tt::TaggedTuple, cache::IdDict{Any, Any})::Tuple = @memoise tt cache begin
+const PassthroughTypes = Union{Vector{UInt8}, Type{Union{}}, Symbol, String}
+const RefVectorTypes = Union{Vector{TaggedParam}, BSONArray}
+
+_raise_recursive(x::T, cache::IdDict{Any, Any}) where T = if isbitstype(T)
+  x
+elseif haskey(cache, x)
+  cache[x]
+else
+  cache[x] = raise_recursive(x, cache)
+end
+
+raise_recursive(x, ::IdDict{Any, Any}) = x
+function raise_recursive(d::BSONDict, cache::IdDict{Any, Any})::BSONDict
+  cache[d] = d
+  applychildren!(x -> _raise_recursive(x, cache), d)
+end
+function raise_recursive(v::T, cache::IdDict{Any, Any}) where {T <: RefVectorTypes}
+  cache[v] = v
+  applyvec!(x -> _raise_recursive(x, cache), v)
+end
+raise_recursive(tt::TaggedTuple, cache::IdDict{Any, Any})::Tuple =
   (raise_recursive(tt.data, cache)...,)
-end
-raise_recursive(tt::TaggedSvec, cache::IdDict{Any, Any})::SimpleVector = @memoise tt cache begin
+raise_recursive(tt::TaggedSvec, cache::IdDict{Any, Any})::SimpleVector =
   Core.svec(raise_recursive(tt.data, cache)...)
-end
-raise_recursive(v::Vector{TaggedParam}, cache::IdDict{Any, Any}) = @prememoise v cache begin
-  applychildren!(x -> raise_recursive(x, cache), v)
-end
-raise_recursive(tt::TaggedType, cache::IdDict{Any, Any})::Type = @memoise tt cache begin
+raise_recursive(tt::TaggedType, cache::IdDict{Any, Any})::Type =
   constructtype(resolve(tt.name), raise_recursive(tt.params, cache))
-end
-raise_recursive(ts::TaggedStruct, cache::IdDict{Any, Any}) = @memoise ts cache begin
-  T::Type = raise_recursive(ts.ttype, cache)
+function raise_recursive(ts::TaggedStruct, cache::IdDict{Any, Any})
+  T::Type = _raise_recursive(ts.ttype, cache)
 
   if ismutable(T)
     return newstruct_raw(cache, T, ts)
@@ -136,8 +150,8 @@ raise_recursive(ts::TaggedStruct, cache::IdDict{Any, Any}) = @memoise ts cache b
     newstruct(T, data...)
   end
 end
-raise_recursive(ta::TaggedArray, cache::IdDict{Any, Any}) = @memoise ta cache begin
-  T::DataType = raise_recursive(ta.ttype, cache)
+function raise_recursive(ta::TaggedArray, cache::IdDict{Any, Any})
+  T::DataType = _raise_recursive(ta.ttype, cache)
   size = raise_recursive(ta.size, cache)
   data() = raise_recursive(ta.data, cache)
 
@@ -151,15 +165,13 @@ raise_recursive(ta::TaggedArray, cache::IdDict{Any, Any}) = @memoise ta cache be
     Array{T}(reshape(data(), size...))
   end
 end
-raise_recursive(ts::TaggedAnonymous, cache::IdDict{Any, Any}) = @memoise ts cache begin
-  tn = raise_recursive(ts.typename::TaggedStruct, cache)
-  pr = raise_recursive(ts.params, cache)
+function raise_recursive(ts::TaggedAnonymous, cache::IdDict{Any, Any})
+  tn = _raise_recursive(ts.typename::TaggedStruct, cache)
+  pr = _raise_recursive(ts.params, cache)
   constructtype(tn.wrapper, pr)
 end
-raise_recursive(ts::TaggedRef, cache::IdDict{Any, Any}) = @memoise ts cache begin
+raise_recursive(ts::TaggedRef, cache::IdDict{Any, Any})::Module =
   resolve(ts.path)
-end
-raise_recursive(tu::TaggedUnionall, cache::IdDict{Any, Any}) = @memoise tu cache begin
-  UnionAll(raise_recursive(tu.var, cache),
-           raise_recursive(tu.body, cache))
-end
+raise_recursive(tu::TaggedUnionall, cache::IdDict{Any, Any})::UnionAll =
+  UnionAll(_raise_recursive(tu.var, cache),
+           _raise_recursive(tu.body, cache))
