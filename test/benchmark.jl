@@ -3,8 +3,10 @@ module Benchmark
 using Profile
 using BSON
 
+export do_bench, do_profile
+
 chars = [x for x in '0':'z']
-strings = [String([rand(chars) for _ in 1:20]) for _ in 1:20]
+strings = [String([rand(chars) for _ in 1:20]) for _ in 1:1000]
 rstr(n::Int)::String = rand(strings)[1:n]
 
 struct Baz
@@ -17,16 +19,18 @@ Baz() = Baz(rstr(20), rstr(1))
 struct Bar
   level::Int64
   bazes::Vector{Baz}
+  salty::AbstractDict{<:AbstractString, <:Unsigned}
 end
 
-Bar() = Bar(rand(Int64), [Baz() for _ in 1:50])
+Bar() = Bar(rand(Int64), [Baz() for _ in 1:50],
+            Dict(s => hash(s, UInt64(0xdeadbeef)) for s in (rstr(x) for x in 10:13)))
 
 struct Foo
   agile::String
   software::String
-  management::String
+  management::Union{String, Symbol}
   consultant::String
-  training::String
+  training::Union{String, Missing}
   projects::Vector{Bar}
 end
 
@@ -39,47 +43,55 @@ struct Result
 end
 
 const history_file = "./benchmark-history.bson"
-history = if isfile(history_file)
-    BSON.load(history_file)::Dict{String, Result}
-else
-    Dict{String, Result}()
-end
 
-macro bench(msg, ex)
+macro bench(hist, msg, ex)
   sex = "$ex"
   quote
     GC.gc()
     @info $msg
     local val, t1, bytes, gctime, memallocs = @timed $(esc(ex))
     local mb = ceil(bytes / (1024 * 1024))
-    if $sex in keys(history)
-      local t0 = history[$sex].elapsed
+    if $sex in keys($(esc(hist)))
+      local t0 = $(esc(hist))[$sex].elapsed
       @info $sex elapsed=t1 speedup=t0/t1 allocatedMb=mb gctime
     else
       @info $sex elapsed=t1 allocatedMb=mb gctime
     end
-    history[$sex] = Result(t1, bytes)
+    $(esc(hist))[$sex] = Result(t1, bytes)
     val
   end
 end
 
-foos = Dict(:Foo => Foo(), :Foo2 => Foo(), :Foo3 => Foo())
+function do_bench()
+  hist = if isfile(history_file)
+    BSON.load(history_file)::Dict{String, Result}
+  else
+    Dict{String, Result}()
+  end
 
-@bench "Roundtrip from cold start (ignore)" BSON.roundtrip(foos)
+  foos = Dict(:Foo => Foo(), :Foo2 => Foo(), :Foo3 => Foo())
 
-io = IOBuffer()
+  @bench hist "Roundtrip from cold start (ignore)" BSON.roundtrip(foos)
 
-@bench "Bench Save BSON" bson(io, foos)
-seek(io, 0)
+  io = IOBuffer()
 
-doc = @bench "Bench Parse BSON Document" BSON.parse_doc(io)
-dref_doc = deepcopy(doc)
-dref_doc = @bench "Bench deref" BSON.backrefs!(dref_doc)
-rfoos = @bench "Bench Raise BSON to Julia types" BSON.raise_recursive(dref_doc, IdDict{Any, Any}())
+  @bench hist "Bench Save BSON" bson(io, foos)
+  seek(io, 0)
 
-bson(history_file, history)
+  doc = @bench hist "Bench Parse BSON Document" BSON.parse_doc(io)
+  dref_doc = deepcopy(doc)
+  dref_doc = @bench hist "Bench deref" BSON.backrefs!(dref_doc)
+  rfoos = @bench hist "Bench Raise BSON to Julia types" BSON.raise_recursive(dref_doc, IdDict{Any, Any}())
 
-if get(ENV, "JULIA_PROFILE", nothing) != nothing
+  # Sanity check the results
+  rfoos[:Foo][1]::Foo
+  rfoos[:Foo][1].projects[1]::Bar
+  rfoos[:Foo][1].projects[1].bazes[1]::Baz
+
+  bson(history_file, hist)
+end
+
+function do_profile()
   minc = parse(Int64, get(ENV, "JULIA_PROFILE_MIN", "0"))
   seek(io, 0)
   GC.gc()
@@ -107,10 +119,5 @@ if get(ENV, "JULIA_PROFILE", nothing) != nothing
   Profile.print(;noisefloor=2, mincount=minc, C=true)
   Profile.clear()
 end
-
-# Sanity check the results
-rfoos[:Foo][1]::Foo
-rfoos[:Foo][1].projects[1]::Bar
-rfoos[:Foo][1].projects[1].bazes[1]::Baz
 
 end
