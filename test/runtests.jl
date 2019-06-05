@@ -75,4 +75,12 @@ end
   @test typeof(f2) !== typeof(f)
 end
 
+@testset "Int Literals in Type Params #41" begin
+  @test BSON.constructtype(Array, (Any, Int32(1))) === Vector{Any}
+  @test BSON.constructtype(Array, (Any, Int64(1))) === Vector{Any}
+
+  @test BSON.load(joinpath(@__DIR__, "test_41_from_32bit.bson")) == Dict(:obj => Dict("name"=>[0x01, 0x02]))
+  @test BSON.load(joinpath(@__DIR__, "test_41_from_64bit.bson")) == Dict(:obj => Dict("name"=>[0x01, 0x02]))
+end
+
 end

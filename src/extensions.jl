@@ -42,8 +42,13 @@ function lower(v::DataType)
            :params => [v.parameters...])
 end
 
-constructtype(T, Ts) = (length(Ts) == 0) ? T : T{Ts...}
-constructtype(T::Type{Tuple}, Ts) = T{Ts...}
+# For issue #41. Type-params are normally Int32, or Int64 depending on saving system Int
+# We should convert them both to loading system Int
+normalize_typeparams(x) = x
+normalize_typeparams(x::Union{Int32,Int64}) = Int(x)
+
+constructtype(T, Ts) = (length(Ts) == 0) ? T : T{map(normalize_typeparams, Ts)...}
+constructtype(T::Type{Tuple}, Ts) = T{map(normalize_typeparams, Ts)...}
 
 tags[:datatype] = d -> constructtype(resolve(d[:name]), d[:params])
 
