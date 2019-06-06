@@ -1,5 +1,5 @@
 name = "BSON"
-uuid = "21824b29-385e-4368-b864-f82723a1f150"
+uuid = "fbb218c0-5317-5bc6-957e-2ee96dd4b1f0"
 version = "0.2.4"
 
 [compat]
