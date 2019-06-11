@@ -65,7 +65,7 @@ lower(x::Vector{Any}) = copy(x)
 lower(x::Vector{UInt8}) = x
 
 reinterpret_(::Type{T}, x) where T =
-  T[reinterpret(T, x)...]
+    T[_x for _x in reinterpret(T, x)]
 
 function lower(x::Array)
   ndims(x) == 1 && !isbitstype(eltype(x)) && return Any[x...]
