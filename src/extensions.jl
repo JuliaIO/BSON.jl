@@ -67,18 +67,38 @@ lower(x::Vector{UInt8}) = x
 reinterpret_(::Type{T}, x) where T =
     T[_x for _x in reinterpret(T, x)]
 
-function lower(x::Array)
-  ndims(x) == 1 && !isbitstype(eltype(x)) && return Any[x...]
-  BSONDict(:tag => "array", :type => eltype(x), :size => Any[size(x)...],
-           :data => isbitstype(eltype(x)) ? reinterpret_(UInt8, reshape(x, :)) : Any[x...])
+
+function collect_any(xs)
+  ys = Vector{Any}(undef, length(xs))
+  for i = 1:length(xs)
+    isassigned(xs, i) && (ys[i] = xs[i])
+  end
+  return ys
 end
 
+
+function lower(x::Array{T,N}) where {T,N}
+  isone(N) && !isbitstype(T) && return collect_any(x)
+  BSONDict(:tag => "array", :type => T, :size => Any[size(x)...],
+           :data => isbitstype(T) ? reinterpret_(UInt8, reshape(x, :)) : collect_any(x))
+end
+
+
 tags[:array] = d ->
-  isbitstype(d[:type]) ?
-    sizeof(d[:type]) == 0 ?
-      fill(d[:type](), d[:size]...) :
-      reshape(reinterpret_(d[:type], d[:data]), d[:size]...) :
-    Array{d[:type]}(reshape(d[:data], d[:size]...))
+if isbitstype(d[:type])
+    if sizeof(d[:type]) == 0
+      fill(d[:type](), d[:size]...)
+    else
+      reshape(reinterpret_(d[:type], d[:data]), d[:size]...)
+    end
+  else
+    a = Array{d[:type]}(undef, d[:size]...)
+    for i in 1:length(d[:data])
+      isassigned(d[:data], i) && (a[i] = d[:data][i])
+    end
+    a
+  end
+
 
 # Structs
 

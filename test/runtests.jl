@@ -2,6 +2,29 @@ using BSON
 using Test
 
 roundtrip_equal(x) = BSON.roundtrip(x) == x
+function roundtrip_equal(x::AbstractArray)
+  result = BSON.roundtrip(x)
+  all(eachindex(result, x)) do I
+    if !isassigned(x, I)
+      !isassigned(result, I)
+    else
+      x[I] == result[I]
+    end
+  end
+end
+
+function roundtrip_equal(x::Dict{Any,Array{Any,2}})
+  result = BSON.roundtrip(x)
+  keys(result) == keys(x)
+  all(keys(x)) do key
+    if isassigned(x[key])
+      x[key] == result[key]
+    else
+      isassigned(x[key]) == isassigned(result[key])
+    end
+  end
+end
+
 
 mutable struct Foo
   x
@@ -33,6 +56,7 @@ end
   @test roundtrip_equal(Array)
   @test roundtrip_equal([1,2,3])
   @test roundtrip_equal(rand(2,3))
+  @test roundtrip_equal(Array{Real}(undef, 2,3))
   @test roundtrip_equal(Array{Real}(rand(2,3)))
   @test roundtrip_equal(1+2im)
   @test roundtrip_equal(Nothing[])
@@ -41,6 +65,7 @@ end
   @test roundtrip_equal(fill(S(), (1,3)))
   @test roundtrip_equal(Set([1,2,3]))
   @test roundtrip_equal(Dict("a"=>1))
+  @test roundtrip_equal(Dict("a"=>Array{Real}(undef, 2,3)))
   @test roundtrip_equal(T(()))
 end
 
