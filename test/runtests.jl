@@ -13,7 +13,7 @@ function roundtrip_equal(x::AbstractArray)
   end
 end
 
-function roundtrip_equal(x::Dict{Any,Array{Any,2}})
+function roundtrip_equal(x::Dict{String,Array{Real,2}})
   result = BSON.roundtrip(x)
   keys(result) == keys(x)
   all(keys(x)) do key
@@ -57,6 +57,7 @@ end
   @test roundtrip_equal([1,2,3])
   @test roundtrip_equal(rand(2,3))
   @test roundtrip_equal(Array{Real}(undef, 2,3))
+  @test roundtrip_equal(Array{String}(undef, 2,3))
   @test roundtrip_equal(Array{Real}(rand(2,3)))
   @test roundtrip_equal(1+2im)
   @test roundtrip_equal(Nothing[])
