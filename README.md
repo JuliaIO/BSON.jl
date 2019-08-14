@@ -22,6 +22,8 @@ Dict{Symbol,Any} with 2 entries:
 
 (Note that the top-level object in BSON is always a `Dict{Symbol,Any}`).
 
+> ⚠️ **Warning**: Loading BSON files is not safe from malicious or erroneously constructed data. Loading BSON files can cause arbitrary code to execute on your machine. Do not load files from unknown or untrusted sources.
+
 There a few utility methods for working with BSON files.
 
 ```julia
