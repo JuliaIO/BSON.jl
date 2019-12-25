@@ -77,7 +77,7 @@ tags[:array] = d ->
   isbitstype(d[:type]) ?
     sizeof(d[:type]) == 0 ?
       fill(d[:type](), d[:size]...) :
-      reshape(reinterpret_(d[:type], d[:data]), d[:size]...) :
+      reshape(reinterpret_(d[:type], d[:data]), map(normalize_typeparams, d[:size])...) :
     Array{d[:type]}(reshape(d[:data], d[:size]...))
 
 # Structs
