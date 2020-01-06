@@ -43,7 +43,7 @@ lower(x::Primitive) = x
 
 import Base: RefValue
 
-ismutable(T) = !isbitstype(T)
+ismutable(T) = !isa(T, DataType) || T.mutable
 ismutable(::Type{String}) = false
 
 typeof_(x) = typeof(x)
