@@ -99,7 +99,6 @@ if isbitstype(d[:type])
     a
   end
 
-
 # Structs
 
 isprimitive(T) = fieldcount(T) == 0 && T.size > 0
@@ -122,7 +121,7 @@ function newstruct!(x, fs...)
 end
 
 function newstruct(T, xs...)
-  if isbitstype(T)
+  if !T.mutable
     flds = Any[convert(fieldtype(T, i), x) for (i,x) in enumerate(xs)]
     return ccall(:jl_new_structv, Any, (Any,Ptr{Cvoid},UInt32), T, flds, length(flds))
   else

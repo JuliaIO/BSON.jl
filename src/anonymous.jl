@@ -1,20 +1,32 @@
 # Methods
 
+if VERSION < v"1.2-"
+const syms_fieldname = :sparam_syms
+else
+const syms_fieldname = :slot_syms
+end
+
+if VERSION < v"1.2-"
+const _uncompress = Base.uncompressed_ast
+else
+const _uncompress = Base._uncompressed_ast
+end
+
 structdata(meth::Method) =
-  [meth.module, meth.name, meth.file, meth.line, meth.sig, meth.sparam_syms,
+  [meth.module, meth.name, meth.file, meth.line, meth.sig, getfield(meth, syms_fieldname),
    meth.ambig, meth.nargs, meth.isva, meth.nospecialize,
-   Base.uncompressed_ast(meth, meth.source)]
+   _uncompress(meth, meth.source)]
 
 initstruct(::Type{Method}) = ccall(:jl_new_method_uninit, Ref{Method}, (Any,), Main)
 
 function newstruct!(meth::Method, mod, name, file, line, sig,
-                    sparam_syms, ambig, nargs, isva, nospecialize, ast)
+                    syms, ambig, nargs, isva, nospecialize, ast)
   meth.module = mod
   meth.name = name
   meth.file = file
   meth.line = line
   meth.sig = sig
-  meth.sparam_syms = sparam_syms
+  setfield!(meth, syms_fieldname, syms)
   meth.ambig = ambig
   meth.nospecialize = nospecialize
   meth.nargs = nargs

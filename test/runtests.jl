@@ -109,4 +109,8 @@ end
   @test BSON.load(joinpath(@__DIR__, "test_41_from_64bit.bson")) == Dict(:obj => Dict("name"=>[0x01, 0x02]))
 end
 
+@testset "MultiDims Arrays saved on 64-bit" begin
+  @test BSON.load(joinpath(@__DIR__, "test_MultiDimsArray_from_64bit.bson"))[:a] == ones(Float32, 2, 2)
+end
+
 end
