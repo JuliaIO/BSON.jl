@@ -145,11 +145,11 @@ tags[:jl_bottom_type] = d -> Union{}
 
 # Base data structures
 
-structdata(d::AbstractDict) = Any[collect(keys(d)), collect(values(d))]
+structdata(d::Union{IdDict,Dict}) = Any[collect(keys(d)), collect(values(d))]
 
-initstruct(D::Type{<:AbstractDict}) = D()
+initstruct(D::Type{<:Union{IdDict,Dict}}) = D()
 
-function newstruct!(d::AbstractDict, ks, vs)
+function newstruct!(d::Union{IdDict,Dict}, ks, vs)
   for (k, v) in zip(ks, vs)
     d[k] = v
   end
