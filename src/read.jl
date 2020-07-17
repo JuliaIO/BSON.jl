@@ -32,15 +32,21 @@ end
 function parse_array(io::IO)::BSONArray
   len = read(io, Int32)
   ps = BSONArray()
-
+  len_set = false
   while (tag = read(io, BSONType)) ≠ eof
     # Note that arrays are dicts with the index as the key
-    while read(io, UInt8) != 0x00
-      nothing
-    end
-    push!(ps, parse_tag(io::IO, tag))
+    # The first index in dict is "length" => length(x)
+      index_or_length = parse_cstr(io)
+      val = parse_tag(io::IO, tag)
+      if index_or_length == "length"
+        resize!(ps, Int(val))
+        len_set = true
+      else
+        i = Base.parse(Int, index_or_length) + 1
+        len_set || resize!(ps, i)
+        ps[i] = val
+      end
   end
-
   ps
 end
 
