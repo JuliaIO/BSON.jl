@@ -1,5 +1,6 @@
 using BSON
 using Test
+import FileIO
 
 roundtrip_equal(x) = BSON.roundtrip(x) == x
 
@@ -89,4 +90,12 @@ end
   @test BSON.load(joinpath(@__DIR__, "test_MultiDimsArray_from_64bit.bson"))[:a] == ones(Float32, 2, 2)
 end
 
+@testset "FileIO Interface" begin
+  s = FileIO.Stream(FileIO.format"BSON", IOBuffer())
+  x = Dict(:hello=>"world")
+  FileIO.save(s, x)
+  seekstart(FileIO.stream(s))
+  y = FileIO.load(s)
+  @test x == y
+end
 end
