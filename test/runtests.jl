@@ -1,7 +1,17 @@
 using BSON
 using Test
 
-roundtrip_equal(x) = BSON.roundtrip(x) == x
+function roundtrip_equal(x)
+  y = BSON.roundtrip(x)
+  typeof(y) == typeof(x) && x == y
+end
+
+# avoid hitting bug where
+# Dict{Symbol,T} -> Dict{Symbol,Any}
+function roundtrip_equal(x::Dict{Symbol}) 
+  y = BSON.roundtrip(x)
+  y isa Dict{Symbol} && y == x
+end
 
 mutable struct Foo
   x
