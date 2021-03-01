@@ -6,13 +6,6 @@ function roundtrip_equal(x)
   typeof(y) == typeof(x) && x == y
 end
 
-# avoid hitting bug where
-# Dict{Symbol,T} -> Dict{Symbol,Any}
-function roundtrip_equal(x::Dict{Symbol}) 
-  y = BSON.roundtrip(x)
-  y isa Dict{Symbol} && y == x
-end
-
 mutable struct Foo
   x
 end
@@ -51,9 +44,14 @@ end
   @test roundtrip_equal(fill(S(), (1,3)))
   @test roundtrip_equal(Set([1,2,3]))
   @test roundtrip_equal(Dict("a"=>1))
+  @test roundtrip_equal(T((1,)))
   @test roundtrip_equal(T(()))
   @test roundtrip_equal(Dict(:a => 1,:b => [1, 2]))
+  @test roundtrip_equal(Dict(:a => 1,2  => [1, 2]))
   @test roundtrip_equal(Dict(:a => [1+2im, 3+4im], :b => "Hello, World!"))
+  @test roundtrip_equal(Dict(:a => [1+2im, 3+4im], 2  => "Hello, World!"))
+  @test roundtrip_equal(Dict(:a => [1+2im, 3+4im], :b => Dict(:c => 1))) # https://github.com/JuliaIO/BSON.jl/issues/84
+  @test roundtrip_equal(Dict(:a => [1+2im, 3+4im], 1  => Dict(:c => 1)))
 end
 
 @testset "Circular References" begin

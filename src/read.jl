@@ -105,6 +105,6 @@ load(x) = raise_recursive(parse(x))
 
 function roundtrip(x)
   buf = IOBuffer()
-  bson(buf, Dict(:data => x))
+  bson(buf, BSONDict(:data => x))
   load(seek(buf, 0))[:data]
 end

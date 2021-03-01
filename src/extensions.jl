@@ -1,6 +1,3 @@
-lower(x::Dict{Symbol}) = BSONDict(x)
-lower(x::BSONDict) = BSONDict(x)
-
 # Basic Types
 
 ismutable(::Type{Symbol}) = false
