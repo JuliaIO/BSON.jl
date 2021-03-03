@@ -66,3 +66,24 @@ Dict{Symbol,Any} with 4 entries:
 
 This is also how the data will appear to readers in other languages, should you
 wish to move data outside of Julia.
+
+## Notes
+
+Below is some semi-official documentation on more advanced usage.
+
+### Loading custom data types within modules
+
+For packages that use BSON.jl to load data, just writing `BSON.load("mydata.bson")` will not work with custom data types. Here's a simple example of that for DataFrames.jl:
+```julia
+module A
+  using DataFrames, BSON
+  d = DataFrame(a = 1:10, b = 5:14)
+  bson("data.bson", Dict(:d=>d))
+  d2 = BSON.load("data.bson") # this will throw an error
+end
+```
+In these cases, you can specify the namespace under which to resolve types like so:
+```julia
+d2 = BSON.load("data.bson", @__MODULE__)
+```
+This will use the current module's namespace when loading the data. You could also pass any module name as the second argument (though almost all cases will use `@__MODULE__`). By default, the namespace is `Main` (i.e. the REPL).
