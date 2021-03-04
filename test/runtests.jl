@@ -25,9 +25,8 @@ struct S end
 
 module A
   using DataFrames, BSON
-  d = DataFrame(a = 1:10, b = 5:14)
-  # this is how the test file was generated
-  #bson("test_25_dataframe.bson", Dict(:d=>d))
+  d = DataFrame(a = 1:10, b = rand(10))
+  bson("test_25_dataframe.bson", Dict(:d=>d))
 end
 
 @testset "BSON" begin
@@ -108,6 +107,7 @@ end
 
 @testset "Namespace other than Main #25" begin
   @test BSON.load("test_25_dataframe.bson", A)[:d] == A.d
+  rm("test_25_dataframe.bson")
 end
 
 end
