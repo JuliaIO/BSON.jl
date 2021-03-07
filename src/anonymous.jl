@@ -50,14 +50,14 @@ end
 
 baremodule __deserialized_types__ end
 
-function newstruct_raw(cache, ::Type{TypeName}, d)
-  name = raise_recursive(d[:data][2], cache)
+function newstruct_raw(cache, ::Type{TypeName}, d, init)
+  name = raise_recursive(d[:data][2], cache, init)
   name = isdefined(__deserialized_types__, name) ? gensym() : name
   tn = ccall(:jl_new_typename_in, Ref{Core.TypeName}, (Any, Any),
              name, __deserialized_types__)
   cache[d] = tn
   names, super, parameters, types, has_instance,
-    abstr, mutabl, ninitialized = map(x -> raise_recursive(x, cache), d[:data][3:end-1])
+    abstr, mutabl, ninitialized = map(x -> raise_recursive(x, cache, init), d[:data][3:end-1])
   tn.names = names
   ndt = ccall(:jl_new_datatype, Any, (Any, Any, Any, Any, Any, Any, Cint, Cint, Cint),
               tn, tn.module, super, parameters, names, types,
@@ -68,7 +68,7 @@ function newstruct_raw(cache, ::Type{TypeName}, d)
     # use setfield! directly to avoid `fieldtype` lowering expecting to see a Singleton object already on ty
     Core.setfield!(ty, :instance, ccall(:jl_new_struct, Any, (Any, Any...), ty))
   end
-  mt = raise_recursive(d[:data][end], cache)
+  mt = raise_recursive(d[:data][end], cache, init)
   if mt != nothing
     mtname, defs, maxa, kwsorter = mt
     tn.mt = ccall(:jl_new_method_table, Any, (Any, Any), name, tn.module)

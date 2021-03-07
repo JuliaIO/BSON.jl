@@ -6,8 +6,9 @@ version = "0.3.1"
 julia = "0.7, 1"
 
 [extras]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Profile = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "Profile"]
+test = ["DataFrames", "Test", "Profile"]

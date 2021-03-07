@@ -23,6 +23,12 @@ end
 
 struct S end
 
+module A
+  using DataFrames, BSON
+  d = DataFrame(a = 1:10, b = rand(10))
+  bson("test_25_dataframe.bson", Dict(:d=>d))
+end
+
 @testset "BSON" begin
 
 @testset "Primitive Types" begin
@@ -97,6 +103,11 @@ end
 
 @testset "MultiDims Arrays saved on 64-bit" begin
   @test BSON.load(joinpath(@__DIR__, "test_MultiDimsArray_from_64bit.bson"))[:a] == ones(Float32, 2, 2)
+end
+
+@testset "Namespace other than Main #25" begin
+  @test BSON.load("test_25_dataframe.bson", A)[:d] == A.d
+  rm("test_25_dataframe.bson")
 end
 
 end
