@@ -12,22 +12,27 @@ else
 const _uncompress = Base._uncompressed_ast
 end
 
+if VERSION < v"1.6-"
 structdata(meth::Method) =
   [meth.module, meth.name, meth.file, meth.line, meth.sig, getfield(meth, syms_fieldname),
    meth.ambig, meth.nargs, meth.isva, meth.nospecialize,
    _uncompress(meth, meth.source)]
+else
+structdata(meth::Method) =
+  [meth.module, meth.name, meth.file, meth.line, meth.sig, getfield(meth, syms_fieldname), 
+   meth.nargs, meth.isva, meth.nospecialize, _uncompress(meth, meth.source)]
+end
 
 initstruct(::Type{Method}) = ccall(:jl_new_method_uninit, Ref{Method}, (Any,), Main)
 
 function newstruct!(meth::Method, mod, name, file, line, sig,
-                    syms, ambig, nargs, isva, nospecialize, ast)
+                    syms, nargs, isva, nospecialize, ast)
   meth.module = mod
   meth.name = name
   meth.file = file
   meth.line = line
   meth.sig = sig
   setfield!(meth, syms_fieldname, syms)
-  meth.ambig = ambig
   meth.nospecialize = nospecialize
   meth.nargs = nargs
   meth.isva = isva
