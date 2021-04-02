@@ -25,6 +25,24 @@ end
 
 initstruct(::Type{Method}) = ccall(:jl_new_method_uninit, Ref{Method}, (Any,), Main)
 
+if VERSION < v"1.6-"
+function newstruct!(meth::Method, mod, name, file, line, sig,
+                    syms, ambig, nargs, isva, nospecialize, ast)
+  meth.module = mod
+  meth.name = name
+  meth.file = file
+  meth.line = line
+  meth.sig = sig
+  setfield!(meth, syms_fieldname, syms)
+  meth.ambig = ambig
+  meth.nospecialize = nospecialize
+  meth.nargs = nargs
+  meth.isva = isva
+  meth.source = ast
+  meth.pure = ast.pure
+  return meth
+end
+else
 function newstruct!(meth::Method, mod, name, file, line, sig,
                     syms, nargs, isva, nospecialize, ast)
   meth.module = mod
@@ -39,6 +57,7 @@ function newstruct!(meth::Method, mod, name, file, line, sig,
   meth.source = ast
   meth.pure = ast.pure
   return meth
+end
 end
 
 function structdata(t::TypeName)
