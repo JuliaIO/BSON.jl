@@ -5,7 +5,20 @@ export bson
 
 using Core: SimpleVector, TypeName
 
-const BSONDict = Dict{Symbol,Any}
+struct BSONDict <: AbstractDict{Symbol,Any}
+    d::Dict{Symbol,Any}
+    BSONDict(v...) = new(Dict{Symbol,Any}(v...))
+end
+# implement some of the needed Dict methods
+Base.length(bd::BSONDict) = length(bd.d)
+Base.isempty(bd::BSONDict) = isempty(bd.d)
+Base.setindex!(bd::BSONDict, v, k) = setindex!(bd.d, v, k)
+Base.getindex(bd::BSONDict, k) = getindex(bd.d, k)
+Base.iterate(bd::BSONDict) = iterate(bd.d)
+Base.iterate(bd::BSONDict, i) = iterate(bd.d, i)
+Base.get(bd::BSONDict, k, d) = get(bd.d, k, d)
+Base.delete!(bd::BSONDict, k) = delete!(bd.d, k)
+
 const BSONArray = Vector{Any}
 const Primitive = Union{Nothing,Bool,Int32,Int64,Float64,String,Vector{UInt8},BSONDict,BSONArray}
 
