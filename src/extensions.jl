@@ -32,6 +32,16 @@ lower(m::Module) = ref(modpath(m)...)
 
 # Types
 
+@static if VERSION < v"1.7.0-DEV"
+  # Borrowed from julia base
+  function ismutabletype(@nospecialize(t::Type))
+      t = Base.unwrap_unionall(t)
+      # TODO: what to do for `Union`?
+      return isa(t, DataType) && t.mutable
+  end
+end
+
+
 ismutable(::Type{<:Type}) = false
 
 typepath(x::DataType) = [modpath(x.name.module)..., x.name.name]
@@ -103,7 +113,7 @@ function newstruct!(x, fs...)
 end
 
 function newstruct(T, xs...)
-  if !T.mutable
+  if !ismutabletype(T)
     flds = Any[convert(fieldtype(T, i), x) for (i,x) in enumerate(xs)]
     return ccall(:jl_new_structv, Any, (Any,Ptr{Cvoid},UInt32), T, flds, length(flds))
   else

@@ -43,7 +43,7 @@ lower(x::Primitive) = x
 
 import Base: RefValue
 
-ismutable(T) = !isa(T, DataType) || T.mutable
+ismutable(T) = !isa(T, DataType) || ismutabletype(T)
 ismutable(::Type{String}) = false
 
 typeof_(x) = typeof(x)

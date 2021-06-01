@@ -67,7 +67,7 @@ function structdata(t::TypeName)
      isdefined(t.mt, :kwsorter) ? t.mt.kwsorter : nothing]
   [Base.string(VERSION), t.name, t.names, primary.super, primary.parameters,
    primary.types, isdefined(primary, :instance), primary.abstract,
-   primary.mutable, primary.ninitialized, mt]
+   ismutabletype(primary), primary.ninitialized, mt]
 end
 
 # Type Names
