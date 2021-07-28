@@ -1,6 +1,6 @@
 # BSON
 
-[![Build Status](https://travis-ci.org/JuliaIO/BSON.jl.svg?branch=master)](https://travis-ci.org/JuliaIO/BSON.jl)
+[![CI](https://github.com/JuliaIO/BSON.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/JuliaIO/BSON.jl/actions/workflows/ci.yml)
 
 BSON.jl is a Julia package for working with the [Binary JSON](http://bsonspec.org/) serialisation format. It can be used as a general store for Julia data structures, with the following features:
 
