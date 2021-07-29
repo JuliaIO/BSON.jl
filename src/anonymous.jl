@@ -60,6 +60,7 @@ function newstruct!(meth::Method, mod, name, file, line, sig,
 end
 end
 
+if VERSION < v"1.7-"
 function structdata(t::TypeName)
   primary = Base.unwrap_unionall(t.wrapper)
   mt = !isdefined(t, :mt) ? nothing :
@@ -69,11 +70,24 @@ function structdata(t::TypeName)
    primary.types, isdefined(primary, :instance), isabstracttype(primary),
    ismutabletype(primary), primary.ninitialized, mt]
 end
+else
+# see https://github.com/JuliaLang/julia/pull/41018 for changes
+function structdata(t::TypeName)
+  primary = Base.unwrap_unionall(t.wrapper)
+  mt = !isdefined(t, :mt) ? nothing :
+    [t.mt.name, collect(Base.MethodList(t.mt)), t.mt.max_args,
+      isdefined(t.mt, :kwsorter) ? t.mt.kwsorter : nothing]
+  [Base.string(VERSION), t.name, t.names, primary.super, primary.parameters,
+    primary.types, isdefined(primary, :instance), t.atomicfields, isabstracttype(primary),
+    ismutable(primary), Core.Compiler.datatype_min_ninitialized(primary), mt]
+end
+end
 
 # Type Names
 
 baremodule __deserialized_types__ end
 
+if VERSION < v"1.7-"
 function newstruct_raw(cache, ::Type{TypeName}, d, init)
   name = raise_recursive(d[:data][2], cache, init)
   name = isdefined(__deserialized_types__, name) ? gensym() : name
@@ -104,6 +118,39 @@ function newstruct_raw(cache, ::Type{TypeName}, d, init)
     end
   end
   return tn
+end
+else
+function newstruct_raw(cache, ::Type{TypeName}, d, init)
+  name = raise_recursive(d[:data][2], cache, init)
+  name = isdefined(__deserialized_types__, name) ? gensym() : name
+  tn = ccall(:jl_new_typename_in, Ref{Core.TypeName}, (Any, Any),
+             name, __deserialized_types__)
+  cache[d] = tn
+  names, super, parameters, types, has_instance, atomicfields,
+    abstr, mutabl, ninitialized = map(x -> raise_recursive(x, cache, init), d[:data][3:end-1])
+  tn.names = names
+  ndt = ccall(:jl_new_datatype, Any, (Any, Any, Any, Any, Any, Any, Any, Cint, Cint, Cint),
+              tn, tn.module, super, parameters, names, types, atomicfields,
+              abstr, mutabl, ninitialized)
+  ty = tn.wrapper = ndt.name.wrapper
+  ccall(:jl_set_const, Cvoid, (Any, Any, Any), tn.module, tn.name, ty)
+  if has_instance && !isdefined(ty, :instance)
+    # use setfield! directly to avoid `fieldtype` lowering expecting to see a Singleton object already on ty
+    Core.setfield!(ty, :instance, ccall(:jl_new_struct, Any, (Any, Any...), ty))
+  end
+  mt = raise_recursive(d[:data][end], cache, init)
+  if mt != nothing
+    mtname, defs, maxa, kwsorter = mt
+    tn.mt = ccall(:jl_new_method_table, Any, (Any, Any), name, tn.module)
+    tn.mt.name = mtname
+    tn.mt.max_args = maxa
+    for def in defs
+      isdefined(def, :sig) || continue
+      ccall(:jl_method_table_insert, Cvoid, (Any, Any, Ptr{Cvoid}), tn.mt, def, C_NULL)
+    end
+  end
+  return tn
+end
 end
 
 # Function Types

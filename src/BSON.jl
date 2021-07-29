@@ -3,8 +3,6 @@ module BSON
 using Core: SimpleVector, TypeName
 export bson
 
-using Core: SimpleVector, TypeName
-
 const BSONDict = Dict{Symbol,Any}
 const BSONArray = Vector{Any}
 const Primitive = Union{Nothing,Bool,Int32,Int64,Float64,String,Vector{UInt8},BSONDict,BSONArray}
