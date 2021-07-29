@@ -101,6 +101,26 @@ end
   @test x.x === x
 end
 
+@testset "Undefined References" begin
+  # from Issue #3
+  d = Dict(:a => 1, :b => Dict(:c => 3, :d => Dict("e" => 5)))
+  @test roundtrip_equal(d)
+
+  # from Issue #43
+  x = Array{String, 1}(undef, 5)
+  x[1] = "a"
+  x[4] = "d"
+  @test_broken roundtrip_equal(Dict(:x => x))
+
+  struct NoInit
+    x::Int
+
+    NoInit() = new()
+  end
+  x = NoInit()
+  @test roundtrip_equal(x)
+end
+
 @testset "Anonymous Functions" begin
   f = x -> x+1
   if VERSION < v"1.7-"

@@ -60,6 +60,8 @@ function newstruct!(meth::Method, mod, name, file, line, sig,
 end
 end
 
+# Type Names
+
 if VERSION < v"1.7-"
 function structdata(t::TypeName)
   primary = Base.unwrap_unionall(t.wrapper)
@@ -83,7 +85,10 @@ function structdata(t::TypeName)
 end
 end
 
-# Type Names
+if VERSION >= v"1.7-"
+structdata(x::Core.TypeofVararg) =
+  Any[getfield(x, f) for f in fieldnames(typeof(x)) if isdefined(x, f)]
+end
 
 baremodule __deserialized_types__ end
 
