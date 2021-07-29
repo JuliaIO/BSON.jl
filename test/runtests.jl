@@ -34,6 +34,12 @@ module A
   bson("test_25_dataframe.bson", Dict(:d=>d))
 end
 
+struct NoInit
+  x::Int
+
+  NoInit() = new()
+end
+
 @testset "BSON" begin
 
 @testset "Primitive Types" begin
@@ -112,11 +118,6 @@ end
   x[4] = "d"
   @test_broken roundtrip_equal(Dict(:x => x))
 
-  struct NoInit
-    x::Int
-
-    NoInit() = new()
-  end
   x = NoInit()
   @test roundtrip_equal(x)
 end
