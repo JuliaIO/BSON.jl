@@ -23,6 +23,11 @@ end
 
 struct S end
 
+struct Bar
+  a
+  Bar() = new()
+end
+
 module A
   using DataFrames, BSON
   d = DataFrame(a = 1:10, b = rand(10))
@@ -39,6 +44,22 @@ end
   @test roundtrip_equal("b")
   @test roundtrip_equal([1,"b"])
   @test roundtrip_equal(Tuple)
+  @test roundtrip_equal(Tuple{Int, Float64})
+  @test roundtrip_equal(Vararg{Any})
+end
+
+@testset "Undefined References" begin
+  # from Issue #3
+  d = Dict(:a => 1, :b => Dict(:c => 3, :d => Dict("e" => 5)))
+  @test roundtrip_equal(d)
+
+  # from Issue #43
+  x = Array{String, 1}(undef, 5)
+  x[1] = "a"
+  x[4] = "d"
+  @test_broken roundtrip_equal(Dict(:x => x))
+
+  @test roundtrip_equal(Bar())
 end
 
 @testset "Complex Types" begin
