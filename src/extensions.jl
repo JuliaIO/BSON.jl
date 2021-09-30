@@ -93,10 +93,8 @@ tags[:array] = d ->
 
 # Structs
 
-isprimitive(T) = fieldcount(T) == 0 && T.size > 0
-
-structdata(x) = isprimitive(typeof(x)) ? reinterpret_(UInt8, [x]) :
-    Any[getfield(x, f) for f in fieldnames(typeof(x))]
+structdata(x) = isprimitivetype(typeof(x)) ? reinterpret_(UInt8, [x]) :
+    Any[getfield(x,f) for f in fieldnames(typeof(x)) if isdefined(x, f)]
 
 function lower(x)
   BSONDict(:tag => "struct", :type => typeof(x), :data => structdata(x))
@@ -139,7 +137,7 @@ end
 newprimitive(T, data) = reinterpret_(T, data)[1]
 
 tags[:struct] = d ->
-  isprimitive(d[:type]) ?
+  isprimitivetype(d[:type]) ?
     newprimitive(d[:type], d[:data]) :
     newstruct(d[:type], d[:data]...)
 
