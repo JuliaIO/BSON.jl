@@ -8,7 +8,7 @@ end
 
 # avoid hitting bug where
 # Dict{Symbol,T} -> Dict{Symbol,Any}
-function roundtrip_equal(x::Dict{Symbol}) 
+function roundtrip_equal(x::Dict{Symbol})
   y = BSON.roundtrip(x)
   y isa Dict{Symbol} && y == x
 end
@@ -22,6 +22,11 @@ struct T{A}
 end
 
 struct S end
+
+struct Bar
+  a
+  Bar() = new()
+end
 
 module A
   using DataFrames, BSON
@@ -39,6 +44,22 @@ end
   @test roundtrip_equal("b")
   @test roundtrip_equal([1,"b"])
   @test roundtrip_equal(Tuple)
+  @test roundtrip_equal(Tuple{Int, Float64})
+  @test roundtrip_equal(Vararg{Any})
+end
+
+@testset "Undefined References" begin
+  # from Issue #3
+  d = Dict(:a => 1, :b => Dict(:c => 3, :d => Dict("e" => 5)))
+  @test roundtrip_equal(d)
+
+  # from Issue #43
+  x = Array{String, 1}(undef, 5)
+  x[1] = "a"
+  x[4] = "d"
+  @test_broken roundtrip_equal(Dict(:x => x))
+
+  @test roundtrip_equal(Bar())
 end
 
 @testset "Complex Types" begin
@@ -82,15 +103,19 @@ end
 
 @testset "Anonymous Functions" begin
   f = x -> x+1
-  f2 = BSON.roundtrip(f)
-  @test f2(5) == f(5)
-  @test typeof(f2) !== typeof(f)
+  if VERSION < v"1.7-"
+    f2 = BSON.roundtrip(f)
+    @test f2(5) == f(5)
+    @test typeof(f2) !== typeof(f)
 
-  chicken_tikka_masala(y) = x -> x+y
-  f = chicken_tikka_masala(5)
-  f2 = BSON.roundtrip(f)
-  @test f2(6) == f(6)
-  @test typeof(f2) !== typeof(f)
+    chicken_tikka_masala(y) = x -> x+y
+    f = chicken_tikka_masala(5)
+    f2 = BSON.roundtrip(f)
+    @test f2(6) == f(6)
+    @test typeof(f2) !== typeof(f)
+  else
+    @test_throws ErrorException f2 = BSON.roundtrip(f)
+  end
 end
 
 @testset "Int Literals in Type Params #41" begin

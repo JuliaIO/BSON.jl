@@ -32,6 +32,16 @@ lower(m::Module) = ref(modpath(m)...)
 
 # Types
 
+@static if VERSION < v"1.7.0-DEV"
+  # Borrowed from julia base
+  function ismutabletype(@nospecialize(t::Type))
+      t = Base.unwrap_unionall(t)
+      # TODO: what to do for `Union`?
+      return isa(t, DataType) && t.mutable
+  end
+end
+
+
 ismutable(::Type{<:Type}) = false
 
 typepath(x::DataType) = [modpath(x.name.module)..., x.name.name]
@@ -83,10 +93,8 @@ tags[:array] = d ->
 
 # Structs
 
-isprimitive(T) = fieldcount(T) == 0 && T.size > 0
-
-structdata(x) = isprimitive(typeof(x)) ? reinterpret_(UInt8, [x]) :
-    Any[getfield(x, f) for f in fieldnames(typeof(x))]
+structdata(x) = isprimitivetype(typeof(x)) ? reinterpret_(UInt8, [x]) :
+    Any[getfield(x,f) for f in fieldnames(typeof(x)) if isdefined(x, f)]
 
 function lower(x)
   BSONDict(:tag => "struct", :type => typeof(x), :data => structdata(x))
@@ -103,7 +111,7 @@ function newstruct!(x, fs...)
 end
 
 function newstruct(T, xs...)
-  if !T.mutable
+  if !ismutabletype(T)
     flds = Any[convert(fieldtype(T, i), x) for (i,x) in enumerate(xs)]
     return ccall(:jl_new_structv, Any, (Any,Ptr{Cvoid},UInt32), T, flds, length(flds))
   else
@@ -129,7 +137,7 @@ end
 newprimitive(T, data) = reinterpret_(T, data)[1]
 
 tags[:struct] = d ->
-  isprimitive(d[:type]) ?
+  isprimitivetype(d[:type]) ?
     newprimitive(d[:type], d[:data]) :
     newstruct(d[:type], d[:data]...)
 

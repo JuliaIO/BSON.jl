@@ -19,7 +19,7 @@ structdata(meth::Method) =
    _uncompress(meth, meth.source)]
 else
 structdata(meth::Method) =
-  [meth.module, meth.name, meth.file, meth.line, meth.sig, getfield(meth, syms_fieldname), 
+  [meth.module, meth.name, meth.file, meth.line, meth.sig, getfield(meth, syms_fieldname),
    meth.nargs, meth.isva, meth.nospecialize, _uncompress(meth, meth.source)]
 end
 
@@ -66,8 +66,8 @@ function structdata(t::TypeName)
     [t.mt.name, collect(Base.MethodList(t.mt)), t.mt.max_args,
      isdefined(t.mt, :kwsorter) ? t.mt.kwsorter : nothing]
   [Base.string(VERSION), t.name, t.names, primary.super, primary.parameters,
-   primary.types, isdefined(primary, :instance), primary.abstract,
-   primary.mutable, primary.ninitialized, mt]
+   primary.types, isdefined(primary, :instance), isabstracttype(primary),
+   ismutabletype(primary), primary.ninitialized, mt]
 end
 
 # Type Names
