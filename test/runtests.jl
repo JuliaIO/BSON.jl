@@ -34,6 +34,12 @@ module A
   bson("test_25_dataframe.bson", Dict(:d=>d))
 end
 
+struct NoInit
+  x::Int
+
+  NoInit() = new()
+end
+
 @testset "BSON" begin
 
 @testset "Primitive Types" begin
@@ -101,21 +107,32 @@ end
   @test x.x === x
 end
 
+@testset "Undefined References" begin
+  # from Issue #3
+  d = Dict(:a => 1, :b => Dict(:c => 3, :d => Dict("e" => 5)))
+  @test roundtrip_equal(d)
+
+  # from Issue #43
+  x = Array{String, 1}(undef, 5)
+  x[1] = "a"
+  x[4] = "d"
+  @test_broken roundtrip_equal(Dict(:x => x))
+
+  x = NoInit()
+  @test roundtrip_equal(x)
+end
+
 @testset "Anonymous Functions" begin
   f = x -> x+1
-  if VERSION < v"1.7-"
-    f2 = BSON.roundtrip(f)
-    @test f2(5) == f(5)
-    @test typeof(f2) !== typeof(f)
+  f2 = BSON.roundtrip(f)
+  @test f2(5) == f(5)
+  @test typeof(f2) !== typeof(f)
 
-    chicken_tikka_masala(y) = x -> x+y
-    f = chicken_tikka_masala(5)
-    f2 = BSON.roundtrip(f)
-    @test f2(6) == f(6)
-    @test typeof(f2) !== typeof(f)
-  else
-    @test_throws ErrorException f2 = BSON.roundtrip(f)
-  end
+  chicken_tikka_masala(y) = x -> x+y
+  f = chicken_tikka_masala(5)
+  f2 = BSON.roundtrip(f)
+  @test f2(6) == f(6)
+  @test typeof(f2) !== typeof(f)
 end
 
 @testset "Int Literals in Type Params #41" begin

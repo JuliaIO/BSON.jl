@@ -43,7 +43,11 @@ lower(x::Primitive) = x
 
 import Base: RefValue
 
+if VERSION < v"1.7-"
+ismutable(T) = !isa(T, DataType) || T.mutable
+else
 ismutable(T) = !isa(T, DataType) || ismutabletype(T)
+end
 ismutable(::Type{String}) = false
 
 typeof_(x) = typeof(x)
