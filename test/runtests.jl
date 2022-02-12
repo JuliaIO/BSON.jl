@@ -124,19 +124,15 @@ end
 
 @testset "Anonymous Functions" begin
   f = x -> x+1
-  if VERSION < v"1.7-"
-    f2 = BSON.roundtrip(f)
-    @test f2(5) == f(5)
-    @test typeof(f2) !== typeof(f)
+  f2 = BSON.roundtrip(f)
+  @test f2(5) == f(5)
+  @test typeof(f2) !== typeof(f)
 
-    chicken_tikka_masala(y) = x -> x+y
-    f = chicken_tikka_masala(5)
-    f2 = BSON.roundtrip(f)
-    @test f2(6) == f(6)
-    @test typeof(f2) !== typeof(f)
-  else
-    @test_throws ErrorException f2 = BSON.roundtrip(f)
-  end
+  chicken_tikka_masala(y) = x -> x+y
+  f = chicken_tikka_masala(5)
+  f2 = BSON.roundtrip(f)
+  @test f2(6) == f(6)
+  @test typeof(f2) !== typeof(f)
 end
 
 @testset "Int Literals in Type Params #41" begin
