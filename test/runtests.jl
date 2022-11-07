@@ -135,6 +135,20 @@ end
   @test typeof(f2) !== typeof(f)
 end
 
+@testset "Immutable Fields" begin
+  mutable struct ConstFields
+    a::Int
+    const b::Vector{Float64}
+  end
+
+  a = ConstFields(1, [1.])
+  b = BSON.roundtrip(a)
+  @test typeof(a) == typeof(b)
+  map(fieldnames(ConstFields)) do f
+    @test getproperty(a, f) == getproperty(b, f)
+  end
+end
+
 @testset "Int Literals in Type Params #41" begin
   @test BSON.constructtype(Array, (Any, Int32(1))) === Vector{Any}
   @test BSON.constructtype(Array, (Any, Int64(1))) === Vector{Any}
