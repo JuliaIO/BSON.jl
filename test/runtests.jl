@@ -42,6 +42,10 @@ end
 
 @testset "BSON" begin
 
+if VERSION >= v"1.8"
+  include("const_fields.jl")
+end
+
 @testset "Primitive Types" begin
   @test roundtrip_equal(nothing)
   @test roundtrip_equal(1)
@@ -133,22 +137,6 @@ end
   f2 = BSON.roundtrip(f)
   @test f2(6) == f(6)
   @test typeof(f2) !== typeof(f)
-end
-
-if VERSION >= v"1.8"
-  @testset "Immutable Fields" begin
-    mutable struct ConstFields
-      a::Int
-      const b::Vector{Float64}
-    end
-  
-    a = ConstFields(1, [1.])
-    b = BSON.roundtrip(a)
-    @test typeof(a) == typeof(b)
-    map(fieldnames(ConstFields)) do f
-      @test getproperty(a, f) == getproperty(b, f)
-    end
-  end
 end
 
 @testset "Int Literals in Type Params #41" begin
