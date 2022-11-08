@@ -93,69 +93,70 @@ end
 baremodule __deserialized_types__ end
 
 if VERSION < v"1.7-"
-function newstruct_raw(cache, ::Type{TypeName}, d, init)
-  name = raise_recursive(d[:data][2], cache, init)
-  name = isdefined(__deserialized_types__, name) ? gensym() : name
-  tn = ccall(:jl_new_typename_in, Ref{Core.TypeName}, (Any, Any),
-             name, __deserialized_types__)
-  cache[d] = tn
-  names, super, parameters, types, has_instance,
-    abstr, mutabl, ninitialized = map(x -> raise_recursive(x, cache, init), d[:data][3:end-1])
-  tn.names = names
-  ndt = ccall(:jl_new_datatype, Any, (Any, Any, Any, Any, Any, Any, Cint, Cint, Cint),
-              tn, tn.module, super, parameters, names, types,
-              abstr, mutabl, ninitialized)
-  ty = tn.wrapper = ndt.name.wrapper
-  ccall(:jl_set_const, Cvoid, (Any, Any, Any), tn.module, tn.name, ty)
-  if has_instance && !isdefined(ty, :instance)
-    # use setfield! directly to avoid `fieldtype` lowering expecting to see a Singleton object already on ty
-    Core.setfield!(ty, :instance, ccall(:jl_new_struct, Any, (Any, Any...), ty))
-  end
-  mt = raise_recursive(d[:data][end], cache, init)
-  if mt != nothing
-    mtname, defs, maxa, kwsorter = mt
-    tn.mt = ccall(:jl_new_method_table, Any, (Any, Any), name, tn.module)
-    tn.mt.name = mtname
-    tn.mt.max_args = maxa
-    for def in defs
-      isdefined(def, :sig) || continue
-      ccall(:jl_method_table_insert, Cvoid, (Any, Any, Ptr{Cvoid}), tn.mt, def, C_NULL)
+  function newstruct_raw(cache, ::Type{TypeName}, d, init)
+    name = raise_recursive(d[:data][2], cache, init)
+    name = isdefined(__deserialized_types__, name) ? gensym() : name
+    tn = ccall(:jl_new_typename_in, Ref{Core.TypeName}, (Any, Any),
+               name, __deserialized_types__)
+    cache[d] = tn
+    names, super, parameters, types, has_instance,
+      abstr, mutabl, ninitialized = map(x -> raise_recursive(x, cache, init), d[:data][3:end-1])
+    tn.names = names
+    ndt = ccall(:jl_new_datatype, Any, (Any, Any, Any, Any, Any, Any, Cint, Cint, Cint),
+                tn, tn.module, super, parameters, names, types,
+                abstr, mutabl, ninitialized)
+    ty = tn.wrapper = ndt.name.wrapper
+    ccall(:jl_set_const, Cvoid, (Any, Any, Any), tn.module, tn.name, ty)
+    if has_instance && !isdefined(ty, :instance)
+      # use setfield! directly to avoid `fieldtype` lowering expecting to see a Singleton object already on ty
+      Core.setfield!(ty, :instance, ccall(:jl_new_struct, Any, (Any, Any...), ty))
     end
+    mt = raise_recursive(d[:data][end], cache, init)
+    if mt != nothing
+      mtname, defs, maxa, kwsorter = mt
+      tn.mt = ccall(:jl_new_method_table, Any, (Any, Any), name, tn.module)
+      tn.mt.name = mtname
+      tn.mt.max_args = maxa
+      for def in defs
+        isdefined(def, :sig) || continue
+        ccall(:jl_method_table_insert, Cvoid, (Any, Any, Ptr{Cvoid}), tn.mt, def, C_NULL)
+      end
+    end
+    return tn
   end
-  return tn
-end
 else
-function newstruct_raw(cache, ::Type{TypeName}, d, init)
-  name = raise_recursive(d[:data][2], cache, init)
-  name = isdefined(__deserialized_types__, name) ? gensym() : name
-  tn = ccall(:jl_new_typename_in, Ref{Core.TypeName}, (Any, Any),
-             name, __deserialized_types__)
-  cache[d] = tn
-  names, super, parameters, types, has_instance, atomicfields,
-    abstr, mutabl, ninitialized = map(x -> raise_recursive(x, cache, init), d[:data][3:end-1])
-  tn.names = names
-  ndt = ccall(:jl_new_datatype, Any, (Any, Any, Any, Any, Any, Any, Any, Cint, Cint, Cint),
-              tn, tn.module, super, parameters, names, types, atomicfields,
-              abstr, mutabl, ninitialized)
-  ty = tn.wrapper = ndt.name.wrapper
-  ccall(:jl_set_const, Cvoid, (Any, Any, Any), tn.module, tn.name, ty)
-  if has_instance && !isdefined(ty, :instance)
-    # use setfield! directly to avoid `fieldtype` lowering expecting to see a Singleton object already on ty
-    Core.setfield!(ty, :instance, ccall(:jl_new_struct, Any, (Any, Any...), ty))
-  end
-  mt = raise_recursive(d[:data][end], cache, init)
-  if mt != nothing
-    mtname, defs, maxa, kwsorter = mt
-    tn.mt = ccall(:jl_new_method_table, Any, (Any, Any), name, tn.module)
-    tn.mt.name = mtname
-    tn.mt.max_args = maxa
-    for def in defs
-      isdefined(def, :sig) || continue
-      ccall(:jl_method_table_insert, Cvoid, (Any, Any, Ptr{Cvoid}), tn.mt, def, C_NULL)
+  function newstruct_raw(cache, ::Type{TypeName}, d, init)
+    name = raise_recursive(d[:data][2], cache, init)
+    name = isdefined(__deserialized_types__, name) ? gensym() : name
+    tn = ccall(:jl_new_typename_in, Ref{Core.TypeName}, (Any, Any),
+               name, __deserialized_types__)
+    cache[d] = tn
+    names, super, parameters, types, has_instance, atomicfields,
+      abstr, mutabl, ninitialized = map(x -> raise_recursive(x, cache, init), d[:data][3:end-1])
+    ndt = ccall(:jl_new_datatype, Any, (Any, Any, Any, Any, Any, Any, Any, Cint, Cint, Cint),
+                tn, tn.module, super, parameters, names, types, atomicfields,
+                abstr, mutabl, ninitialized)
+    # ty = tn.wrapper = ndt.name.wrapper
+    ty = ndt.name.wrapper
+    ccall(:jl_set_const, Cvoid, (Any, Any, Any), tn.module, tn.name, ty)
+    if has_instance && !isdefined(ty, :instance)
+      # use setfield! directly to avoid `fieldtype` lowering expecting to see a Singleton object already on ty
+      Core.setfield!(ty, :instance, ccall(:jl_new_struct, Any, (Any, Any...), ty))
     end
+    mt = raise_recursive(d[:data][end], cache, init)
+    if mt != nothing
+      mtname, defs, maxa, kwsorter = mt
+      mt = ccall(:jl_new_method_table, Any, (Any, Any), name, tn.module)
+      mt.name = mtname
+      mt.max_args = maxa
+      ccall(:jl_set_nth_field, Cvoid, (Any, Csize_t, Any), tn, Base.fieldindex(Core.TypeName, :mt)-1, mt)
+      for def in defs
+        isdefined(def, :sig) || continue
+        ccall(:jl_method_table_insert, Cvoid, (Any, Any, Ptr{Cvoid}), mt, def, C_NULL)
+      end
+    end
+    return tn
   end
-  return tn
-end
 end
 
 # Function Types

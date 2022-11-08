@@ -42,6 +42,10 @@ end
 
 @testset "BSON" begin
 
+if VERSION >= v"1.8"
+  include("const_fields.jl")
+end
+
 @testset "Primitive Types" begin
   @test roundtrip_equal(nothing)
   @test roundtrip_equal(1)
