@@ -19,8 +19,10 @@ tags[:svec] = d -> Core.svec(d[:data]...)
 ref(path::Symbol...) = BSONDict(:tag => "ref", :path => Base.string.([path...]))
 
 function _find_module(x)
-    pkgid = findfirst(p->p[1].name == x, (k=>v for (k, v) in Base.loaded_modules))
-    return isnothing(pkgid) ? nothing : Base.loaded_modules[pkgid]
+    for (k, v) in Base.loaded_modules
+        k.name == x && return v
+    end
+    return nothing
 end
 
 function resolve(fs, init)
