@@ -28,7 +28,7 @@ end
 function resolve(fs, init)
     ff = first(fs)
     m = _find_module(ff)
-    if !isnothing(m)
+    if m !== nothing
         init = m
         fs = @view fs[2:end]
     end
