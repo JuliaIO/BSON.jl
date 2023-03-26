@@ -31,7 +31,9 @@ end
 module A
   using DataFrames, BSON
   d = DataFrame(a = 1:10, b = rand(10))
+  a = DataFrames.PooledArrays.PooledArray(["a" "b"; "c" "d"])
   bson("test_25_dataframe.bson", Dict(:d=>d))
+  bson("test_26_module_in_module.bson", Dict(:a=>a))
 end
 
 struct NoInit
@@ -154,6 +156,11 @@ end
 @testset "Namespace other than Main #25" begin
   @test BSON.load("test_25_dataframe.bson", A)[:d] == A.d
   rm("test_25_dataframe.bson")
+end
+
+@testset "Module with module import" begin
+  @test BSON.load(joinpath(@__DIR__, "test_26_module_in_module.bson"))[:a] == A.a
+  rm("test_26_module_in_module.bson")
 end
 
 end
