@@ -42,7 +42,7 @@ function newstruct!(meth::Method, mod, name, file, line, sig,
   meth.pure = ast.pure
   return meth
 end
-else
+elseif VERSION < v"1.10-"
 function newstruct!(meth::Method, mod, name, file, line, sig,
                     syms, nargs, isva, nospecialize, ast)
   meth.module = mod
@@ -56,6 +56,22 @@ function newstruct!(meth::Method, mod, name, file, line, sig,
   meth.isva = isva
   meth.source = ast
   meth.pure = ast.pure
+  return meth
+end
+else
+function newstruct!(meth::Method, mod, name, file, line, sig,
+                    syms, nargs, isva, nospecialize, ast)
+  meth.module = mod
+  meth.name = name
+  meth.file = file
+  meth.line = line
+  meth.sig = sig
+  setfield!(meth, syms_fieldname, syms)
+  meth.nospecialize = nospecialize
+  meth.nargs = nargs
+  meth.isva = isva
+  meth.source = ast
+  meth.purity = ast.purity
   return meth
 end
 end
@@ -148,7 +164,7 @@ else
       mtname, defs, maxa, kwsorter = mt
       mt = ccall(:jl_new_method_table, Any, (Any, Any), name, tn.module)
       mt.name = mtname
-      mt.max_args = maxa
+      @atomic mt.max_args = maxa
       ccall(:jl_set_nth_field, Cvoid, (Any, Csize_t, Any), tn, Base.fieldindex(Core.TypeName, :mt)-1, mt)
       for def in defs
         isdefined(def, :sig) || continue
