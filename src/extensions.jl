@@ -108,8 +108,16 @@ tags[:array] = d ->
 
 # Structs
 
-structdata(x) = isprimitivetype(typeof(x)) ? reinterpret_(UInt8, [x]) :
-    Any[getfield(x,f) for f in fieldnames(typeof(x)) if isdefined(x, f)]
+struct Undef end
+function structdata(x)
+  if isprimitivetype(typeof(x))
+    return reinterpret_(UInt8, [x])
+  elseif !ismutabletype(typeof(x))
+    return Any[getfield(x,f) for f in fieldnames(typeof(x)) if isdefined(x, f)]
+  else # mutable structs can have defined fields following undefined fields
+    return Any[isdefined(x, f) ? getfield(x,f) : Undef() for f in fieldnames(typeof(x))]
+  end
+end
 
 function lower(x)
   BSONDict(:tag => "struct", :type => typeof(x), :data => structdata(x))
@@ -119,6 +127,7 @@ initstruct(T) = ccall(:jl_new_struct_uninit, Any, (Any,), T)
 
 function newstruct!(x, fs...)
   for (i, f) = enumerate(fs)
+    isa(f, Undef) && continue
     f = convert(fieldtype(typeof(x),i), f)
     ccall(:jl_set_nth_field, Nothing, (Any, Csize_t, Any), x, i-1, f)
   end
@@ -136,6 +145,7 @@ function newstruct(T, xs...)
     x = initstruct(T)
 
     for (i, f) = enumerate(xs)
+      isa(f, Undef) && continue
       f = convert(fieldtype(typeof(x),i), f)
       ccall(:jl_set_nth_field, Nothing, (Any, Csize_t, Any), x, i-1, f)
     end
@@ -154,6 +164,7 @@ function newstruct(T, xs...)
     x = initstruct(T)
 
     for (i, f) = enumerate(xs)
+      isa(f, Undef) && continue
       f = convert(fieldtype(typeof(x),i), f)
       ccall(:jl_set_nth_field, Nothing, (Any, Csize_t, Any), x, i-1, f)
     end
