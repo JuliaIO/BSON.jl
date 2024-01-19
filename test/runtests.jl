@@ -28,6 +28,25 @@ struct Bar
   Bar() = new()
 end
 
+mutable struct Baz
+  x
+  y
+  z
+  Baz() = new()
+end
+
+function is_field_equal(a, b, field::Symbol)
+  !isdefined(a, field) && return !isdefined(b, field)
+  !isdefined(b, field) && return false
+  return getfield(a, field) == getfield(b, field)
+end
+
+function Base.:(==)(a::Baz, b::Baz)
+  return is_field_equal(a, b, :x) &&
+         is_field_equal(a, b, :y) &&
+         is_field_equal(a, b, :z)
+end
+
 module A
   using DataFrames, BSON
   d = DataFrame(a = 1:10, b = rand(10))
@@ -72,6 +91,10 @@ end
   @test_broken roundtrip_equal(Dict(:x => x))
 
   @test roundtrip_equal(Bar())
+
+  o = Baz()
+  o.y = 1
+  @test roundtrip_equal(o)
 end
 
 @testset "Complex Types" begin
