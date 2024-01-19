@@ -108,7 +108,7 @@ end
 
 baremodule __deserialized_types__ end
 
-if VERSION < v"1.7-"
+@static if VERSION < v"1.7-"
   function newstruct_raw(cache, ::Type{TypeName}, d, init)
     name = raise_recursive(d[:data][2], cache, init)
     name = isdefined(__deserialized_types__, name) ? gensym() : name
