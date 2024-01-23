@@ -113,6 +113,7 @@ end
   @test roundtrip_equal(fill(S(), (1,3)))
   @test roundtrip_equal(Set([1,2,3]))
   @test roundtrip_equal(Dict("a"=>1))
+  @test roundtrip_equal(Dict(:a => 1, :b => [1, 2]))
   @test roundtrip_equal(T(()))
   @test roundtrip_equal(Dict(:a => 1,:b => [1, 2]))
   @test roundtrip_equal(Dict(:a => [1+2im, 3+4im], :b => "Hello, World!"))
